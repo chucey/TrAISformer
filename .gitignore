@@ -2,3 +2,4 @@
 **/us_continent
 notebook/
 .conda
+__pycache__
