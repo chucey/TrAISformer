@@ -249,46 +249,47 @@ print("Ts min: ",np.min(m_msg[:,TIMESTAMP]), "Ts max: ",np.max(m_msg[:,TIMESTAMP
 
 ## Vessel Type    
 #======================================
-print("Selecting vessel type ...")
-def sublist(lst1, lst2):
-   ls1 = [element for element in lst1 if element in lst2]
-   ls2 = [element for element in lst2 if element in lst1]
-   return (len(ls1) != 0) and (ls1 == ls2)
+# print("Selecting vessel type ...")
+# def sublist(lst1, lst2):
+#    ls1 = [element for element in lst1 if element in lst2]
+#    ls2 = [element for element in lst2 if element in lst1]
+#    return (len(ls1) != 0) and (ls1 == ls2)
 
-VesselTypes = dict()
-l_mmsi = []
-n_error = 0
-for v_msg in tqdm(m_msg):
-    try:
-        mmsi_ = v_msg[MMSI]
-        type_ = v_msg[SHIPTYPE]
-        if mmsi_ not in l_mmsi :
-            VesselTypes[mmsi_] = [type_]
-            l_mmsi.append(mmsi_)
-        elif type_ not in VesselTypes[mmsi_]:
-            VesselTypes[mmsi_].append(type_)
-    except:
-        n_error += 1
-        continue
-print(n_error)
-for mmsi_ in tqdm(list(VesselTypes.keys())):
-    VesselTypes[mmsi_] = np.sort(VesselTypes[mmsi_])
+# VesselTypes = dict()
+# l_mmsi = []
+# n_error = 0
+# for v_msg in tqdm(m_msg):
+#     try:
+#         mmsi_ = v_msg[MMSI]
+#         type_ = v_msg[SHIPTYPE]
+#         if mmsi_ not in l_mmsi :
+#             VesselTypes[mmsi_] = [type_]
+#             l_mmsi.append(mmsi_)
+#         elif type_ not in VesselTypes[mmsi_]:
+#             VesselTypes[mmsi_].append(type_)
+#     except:
+#         n_error += 1
+#         continue
+# print(n_error)
+# for mmsi_ in tqdm(list(VesselTypes.keys())):
+#     VesselTypes[mmsi_] = np.sort(VesselTypes[mmsi_])
     
-l_cargo_tanker = []
-l_fishing = []
-for mmsi_ in list(VesselTypes.keys()):
-    if sublist(VesselTypes[mmsi_], list(range(70,80))) or sublist(VesselTypes[mmsi_], list(range(80,90))):
-        l_cargo_tanker.append(mmsi_)
-    if sublist(VesselTypes[mmsi_], [30]):
-        l_fishing.append(mmsi_)
+# l_cargo_tanker = []
+# l_fishing = []
+# for mmsi_ in list(VesselTypes.keys()):
+#     if sublist(VesselTypes[mmsi_], list(range(70,80))) or sublist(VesselTypes[mmsi_], list(range(80,90))):
+#         l_cargo_tanker.append(mmsi_)
+#     if sublist(VesselTypes[mmsi_], [30]):
+#         l_fishing.append(mmsi_)
 
-print("Total number of vessels: ",len(VesselTypes))
-print("Total number of cargos/tankers: ",len(l_cargo_tanker))
-print("Total number of fishing: ",len(l_fishing))
 
-print("Saving vessels' type list to ", cargo_tanker_filename)
-np.save(cargo_tanker_filename,l_cargo_tanker)
-np.save(cargo_tanker_filename.replace("_cargo_tanker.npy","_fishing.npy"),l_fishing)
+# print("Total number of vessels: ",len(VesselTypes))
+# print("Total number of cargos/tankers: ",len(l_cargo_tanker))
+# print("Total number of fishing: ",len(l_fishing))
+
+# print("Saving vessels' type list to ", cargo_tanker_filename)
+# np.save(cargo_tanker_filename,l_cargo_tanker)
+# np.save(cargo_tanker_filename.replace("_cargo_tanker.npy","_fishing.npy"),l_fishing)
 
 
 ## FILTERING 
@@ -345,75 +346,75 @@ print("Convert to dicts of vessel's tracks...")
 #
 
 # Training set
-# Vs_train = dict()
-# for v_msg in tqdm(m_msg_train):
-#     mmsi = int(v_msg[MMSI])
-#     if not (mmsi in list(Vs_train.keys())):
-#         Vs_train[mmsi] = np.empty((0,9))
-#     Vs_train[mmsi] = np.concatenate((Vs_train[mmsi], np.expand_dims(v_msg[:9],0)), axis = 0)
-# for key in tqdm(list(Vs_train.keys())):
-#     if CARGO_TANKER_ONLY and (not key in l_cargo_tanker):
-#         del Vs_train[key]
-#     else:
-#         Vs_train[key] = np.array(sorted(Vs_train[key], key=lambda m_entry: m_entry[TIMESTAMP]))     
+Vs_train = dict()
+for v_msg in tqdm(m_msg_train):
+    mmsi = int(v_msg[MMSI])
+    if not (mmsi in list(Vs_train.keys())):
+        Vs_train[mmsi] = np.empty((0,11))
+    Vs_train[mmsi] = np.concatenate((Vs_train[mmsi], np.expand_dims(v_msg[:11],0)), axis = 0)
+for key in tqdm(list(Vs_train.keys())):
+    if CARGO_TANKER_ONLY and (not key in l_cargo_tanker):
+        del Vs_train[key]
+    else:
+        Vs_train[key] = np.array(sorted(Vs_train[key], key=lambda m_entry: m_entry[TIMESTAMP]))     
 
-Vs_train_list = []
-for item in tqdm(unique_m_msg_train_mmsi):
-    Vs_train = dict()
-    item = int(item)
-    Vs_train['mmsi'] = item
-    Vs_train['traj'] = m_msg_train[m_msg_train[:,MMSI]==item]
-    Vs_train_list.append(Vs_train)
+# Vs_train_list = []
+# for item in tqdm(unique_m_msg_train_mmsi):
+#     Vs_train = dict()
+#     item = int(item)
+#     Vs_train['mmsi'] = item
+#     Vs_train['traj'] = m_msg_train[m_msg_train[:,MMSI]==item]
+#     Vs_train_list.append(Vs_train)
 
 # Validation set
-# Vs_valid = dict()
-# for v_msg in tqdm(m_msg_valid):
-#     mmsi = int(v_msg[MMSI])
-#     if not (mmsi in list(Vs_valid.keys())):
-#         Vs_valid[mmsi] = np.empty((0,9))
-#     Vs_valid[mmsi] = np.concatenate((Vs_valid[mmsi], np.expand_dims(v_msg[:9],0)), axis = 0)
-# for key in tqdm(list(Vs_valid.keys())):
-#     if CARGO_TANKER_ONLY and (not key in l_cargo_tanker):
-#         del Vs_valid[key]
-#     else:
-#         Vs_valid[key] = np.array(sorted(Vs_valid[key], key=lambda m_entry: m_entry[TIMESTAMP]))
+Vs_valid = dict()
+for v_msg in tqdm(m_msg_valid):
+    mmsi = int(v_msg[MMSI])
+    if not (mmsi in list(Vs_valid.keys())):
+        Vs_valid[mmsi] = np.empty((0,11))
+    Vs_valid[mmsi] = np.concatenate((Vs_valid[mmsi], np.expand_dims(v_msg[:11],0)), axis = 0)
+for key in tqdm(list(Vs_valid.keys())):
+    if CARGO_TANKER_ONLY and (not key in l_cargo_tanker):
+        del Vs_valid[key]
+    else:
+        Vs_valid[key] = np.array(sorted(Vs_valid[key], key=lambda m_entry: m_entry[TIMESTAMP]))
 
-Vs_valid_list = []
-for item in tqdm(unique_m_msg_valid_mmsi):
-    Vs_valid = dict()
-    item = int(item)
-    Vs_valid['mmsi'] = item
-    Vs_valid['traj'] = m_msg_valid[m_msg_valid[:,MMSI]==item]
-    Vs_valid_list.append(Vs_valid)
+# Vs_valid_list = []
+# for item in tqdm(unique_m_msg_valid_mmsi):
+#     Vs_valid = dict()
+#     item = int(item)
+#     Vs_valid['mmsi'] = item
+#     Vs_valid['traj'] = m_msg_valid[m_msg_valid[:,MMSI]==item]
+#     Vs_valid_list.append(Vs_valid)
 
 # Test set
-# Vs_test = dict()
-# for v_msg in tqdm(m_msg_test):
-#     mmsi = int(v_msg[MMSI])
-#     if not (mmsi in list(Vs_test.keys())):
-#         Vs_test[mmsi] = np.empty((0,9))
-#     Vs_test[mmsi] = np.concatenate((Vs_test[mmsi], np.expand_dims(v_msg[:9],0)), axis = 0)
-# for key in tqdm(list(Vs_test.keys())):
-#     if CARGO_TANKER_ONLY and (not key in l_cargo_tanker):
-#         del Vs_test[key]
-#     else:
-#         Vs_test[key] = np.array(sorted(Vs_test[key], key=lambda m_entry: m_entry[TIMESTAMP]))
+Vs_test = dict()
+for v_msg in tqdm(m_msg_test):
+    mmsi = int(v_msg[MMSI])
+    if not (mmsi in list(Vs_test.keys())):
+        Vs_test[mmsi] = np.empty((0,11))
+    Vs_test[mmsi] = np.concatenate((Vs_test[mmsi], np.expand_dims(v_msg[:11],0)), axis = 0)
+for key in tqdm(list(Vs_test.keys())):
+    if CARGO_TANKER_ONLY and (not key in l_cargo_tanker):
+        del Vs_test[key]
+    else:
+        Vs_test[key] = np.array(sorted(Vs_test[key], key=lambda m_entry: m_entry[TIMESTAMP]))
 
-Vs_test_list = []
-for item in tqdm(unique_m_msg_test_mmsi):
-    Vs_test = dict()
-    item = int(item)
-    Vs_test['mmsi'] = item
-    Vs_test['traj'] = m_msg_test[m_msg_test[:,MMSI]==item]
-    Vs_test_list.append(Vs_test)
+# Vs_test_list = []
+# for item in tqdm(unique_m_msg_test_mmsi):
+#     Vs_test = dict()
+#     item = int(item)
+#     Vs_test['mmsi'] = item
+#     Vs_test['traj'] = m_msg_test[m_msg_test[:,MMSI]==item]
+#     Vs_test_list.append(Vs_test)
 
 ## PICKLING
 #======================================
 for filename, filedict in zip([pkl_filename_train,pkl_filename_valid,pkl_filename_test],
-                              [Vs_train_list,Vs_valid_list,Vs_test_list]
+                              [Vs_train,Vs_valid,Vs_test]
                              ):
-    print("Writing to ", os.path.join(os.getcwd(),filename),"...")
-    with open(os.path.join(os.getcwd(),filename),"wb") as f:
+    print("Writing to ", os.path.join('data', 'US_data',filename),"...")
+    with open(os.path.join('data', 'US_data',filename),"wb") as f:
         pickle.dump(filedict,f)
     print("Total number of tracks: ", len(filedict))
 
