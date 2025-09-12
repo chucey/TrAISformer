@@ -37,6 +37,17 @@ import utils
 from trAISformer import TB_LOG
 
 logger = logging.getLogger(__name__)
+device = torch.device("mps")
+
+def get_device():
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+    elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+        device = torch.device("mps")
+    else:
+        device = torch.device("cpu")
+    
+    print("Using device:", device)
 
 
 @torch.no_grad()
@@ -131,14 +142,25 @@ class TrainerConfig:
 
 class Trainer:
 
-    def __init__(self, model, train_dataset, test_dataset, config, savedir=None, device=torch.device("cpu"), aisdls={},
+    def __init__(self, model, train_dataset, test_dataset, config, savedir=None, device=get_device(), aisdls={},
                  INIT_SEQLEN=0):
+        
+        # debug: list any cuda tensors BEFORE moving the model
+        bad = []
+        for n, p in model.named_parameters(recurse=True):
+            if hasattr(p, "is_cuda") and p.is_cuda:
+                bad.append(("param", n, str(p.device)))
+        for n, b in model.named_buffers(recurse=True):
+            if hasattr(b, "is_cuda") and b.is_cuda:
+                bad.append(("buffer", n, str(b.device)))
+        print("CUDA tensors present before to(device):", bad[:10], "… count:", len(bad))
+
         self.train_dataset = train_dataset
         self.test_dataset = test_dataset
         self.config = config
         self.savedir = savedir
 
-        self.device = device
+        self.device = torch.device("mps")
         self.model = model.to(device)
         self.aisdls = aisdls
         self.INIT_SEQLEN = INIT_SEQLEN
