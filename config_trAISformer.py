@@ -23,11 +23,17 @@ import torch
 
 class Config():
     retrain = True
-    tb_log = False
-    device = torch.device("cuda:0")
-#     device = torch.device("cpu")
-    
-    max_epochs = 50
+    tb_log = True
+
+    if torch.backends.mps.is_available():
+        device = torch.device("mps")
+    elif torch.cuda.is_available():
+        device = torch.device("cuda:0")
+    else:
+        device = torch.device("cpu")
+    print(f"Using device: {device}")
+
+    max_epochs = 10
     batch_size = 32
     n_samples = 16
     
@@ -35,12 +41,12 @@ class Config():
     max_seqlen = 120
     min_seqlen = 36
     
-    dataset_name = "ct_dma"
+    dataset_name = "us_continent_2024" # "ct_dma", "us_continent", "us_eastcoast", "us_westcoast"
 
-    if dataset_name == "ct_dma": #==============================
-   
-        # When mode == "grad" or "pos_grad", sog and cog are actually dlat and 
-        # dlon    
+    if dataset_name == "us_continent_2024": #==============================
+
+        # When mode == "grad" or "pos_grad", sog and cog are actually dlat and
+        # dlon
         lat_size = 250
         lon_size = 270
         sog_size = 30
@@ -52,10 +58,10 @@ class Config():
         n_sog_embd = 128
         n_cog_embd = 128
     
-        lat_min = 55.5
-        lat_max = 58.0
-        lon_min = 10.3
-        lon_max = 13
+        lat_min = 20 #55.5
+        lat_max = 60    #58.0
+        lon_min = -160  #10.3
+        lon_max = -60 #13
 
     
     #===========================================================================
@@ -78,12 +84,12 @@ class Config():
     
     # Data flags
     #===================================================
-    datadir = f"./data/{dataset_name}/"
-    trainset_name = f"{dataset_name}_train.pkl"
-    validset_name = f"{dataset_name}_valid.pkl"
-    testset_name = f"{dataset_name}_test.pkl"
-    
-    
+    datadir = os.path.join(os.getcwd(), "data", "US_data", "cleaned_data")
+    trainset_name = os.path.join(datadir, f"{dataset_name}_train_track.pkl")
+    validset_name = os.path.join(datadir, f"{dataset_name}_valid_track.pkl")
+    testset_name = os.path.join(datadir, f"{dataset_name}_test_track.pkl")
+
+
     # model parameters
     #===================================================
     n_head = 8
