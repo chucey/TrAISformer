@@ -3,3 +3,5 @@
 notebook/
 .conda
 __pycache__
+results/
+runs/
