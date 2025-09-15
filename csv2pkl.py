@@ -274,7 +274,7 @@ print("Ts min: ",np.min(m_msg[:,TIMESTAMP]), "Ts max: ",np.max(m_msg[:,TIMESTAMP
 # for mmsi_ in tqdm(list(VesselTypes.keys())):
 #     VesselTypes[mmsi_] = np.sort(VesselTypes[mmsi_])
     
-# l_cargo_tanker = []
+l_cargo_tanker = []
 # l_fishing = []
 # for mmsi_ in list(VesselTypes.keys()):
 #     if sublist(VesselTypes[mmsi_], list(range(70,80))) or sublist(VesselTypes[mmsi_], list(range(80,90))):
