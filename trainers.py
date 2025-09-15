@@ -226,17 +226,19 @@ class Trainer:
 
                     # tb logging
                     if TB_LOG:
-                        tb.add_scalar("loss",
+                         from torch.utils.tensorboard import SummaryWriter
+                         tb = SummaryWriter()
+                         tb.add_scalar("loss",
                                       loss.item(),
                                       epoch * n_batches + it)
-                        tb.add_scalar("lr",
+                         tb.add_scalar("lr",
                                       lr,
                                       epoch * n_batches + it)
 
-                        for name, params in model.head.named_parameters():
+                         for name, params in model.head.named_parameters():
                             tb.add_histogram(f"head.{name}", params, epoch * n_batches + it)
                             tb.add_histogram(f"head.{name}.grad", params.grad, epoch * n_batches + it)
-                        if model.mode in ("gridcont_real",):
+                         if model.mode in ("gridcont_real",):
                             for name, params in model.res_pred.named_parameters():
                                 tb.add_histogram(f"res_pred.{name}", params, epoch * n_batches + it)
                                 tb.add_histogram(f"res_pred.{name}.grad", params.grad, epoch * n_batches + it)
@@ -279,7 +281,7 @@ class Trainer:
             # ==========================================================================================
             # ==========================================================================================
             raw_model = model.module if hasattr(self.model, "module") else model
-            seqs, masks, seqlens, mmsis, time_starts = iter(aisdls["test"]).next()
+            seqs, masks, seqlens, mmsis, time_starts = next(iter(aisdls["test"]))
             n_plots = 7
             init_seqlen = INIT_SEQLEN
             seqs_init = seqs[:n_plots, :init_seqlen, :].to(self.device)
