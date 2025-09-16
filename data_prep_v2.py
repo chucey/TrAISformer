@@ -37,7 +37,7 @@ LON_MAX = -60
 
 LAT_RANGE = LAT_MAX - LAT_MIN
 LON_RANGE = LON_MAX - LON_MIN
-SPEED_MAX = 50  # knots
+SPEED_MAX = 30  # knots
 DURATION_MAX = 24 #h
 
 EPOCH = datetime(1970, 1, 1)
@@ -109,25 +109,25 @@ for filename in l_input_filepath:
 
     # STEP 3: REMOVING SHORT VOYAGES
     #======================================
-    # Removing AIS track whose length is smaller than 10 or those last less than 10min
-    print("Removing AIS track whose length is smaller than 10 or those last less than 10min...")
+    # Removing AIS track whose length is smaller than 20 or those last less than 4 hours
+    print("Removing AIS track whose length is smaller than 20 or those last less than 4 hours...")
 
     for k in list(voyages.keys()):
         duration = voyages[k][-1,TIMESTAMP] - voyages[k][0,TIMESTAMP]
-        if (len(voyages[k]) < 10) or (duration < 10*60):
+        if (len(voyages[k]) < 20) or (duration < 4*3600):
             voyages.pop(k, None)
     print(f" After removing short voyages, length: {len(voyages)}\n")
 
     ## STEP 4: SAMPLING
     #======================================
-    # Sampling, resolution = 5 min
+    # Sampling, resolution = 10 min
     print('Sampling...')
     Vs = dict()
     count = 0
     for k in tqdm(list(voyages.keys())):
         v = voyages[k]
         sampling_track = np.empty((0, 11)) # [Lat, Lon, SOG, COG, Heading, Timestamp, MMSI, ShipType, Length, Width, Cargo]
-        for t in range(int(v[0,TIMESTAMP]), int(v[-1,TIMESTAMP]), 300): # 5 min
+        for t in range(int(v[0,TIMESTAMP]), int(v[-1,TIMESTAMP]), 600): # 10 min
             tmp = utils.interpolate(t,v)
             if tmp is not None:
                 sampling_track = np.vstack([sampling_track, tmp])
@@ -151,7 +151,7 @@ for filename in l_input_filepath:
         tmp = np.split(v,idx)
         for subtrack in tmp:
             # only use tracks whose duration >= 4 hours
-            if len(subtrack) >= 12*1:
+            if len(subtrack) >= 12*4:
                 Data[count] = subtrack
                 count += 1
     print(f" After re-splitting file: {file}, length: {len(Data)}\n")
