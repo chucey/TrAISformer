@@ -39,7 +39,7 @@ class Config():
     
     init_seqlen = 18
     max_seqlen = 120
-    min_seqlen = 36
+    min_seqlen = 10 # was 36
     
     dataset_name = "us_continent_2024" # "ct_dma", "us_continent", "us_eastcoast", "us_westcoast"
 
@@ -47,8 +47,8 @@ class Config():
 
         # When mode == "grad" or "pos_grad", sog and cog are actually dlat and
         # dlon
-        lat_size = 250
-        lon_size = 270
+        lat_size = 400 #250 for Danish data
+        lon_size = 1000  #270 for Danish data
         sog_size = 30
         cog_size = 72
 
