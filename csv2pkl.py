@@ -164,7 +164,7 @@ t_max = time.mktime(time.strptime("31/01/2020 23:59:59", "%Y-%m-%dT%H:%M:%S"))
 # LON_MAX = -60.0
 
 dataset_path = "/Users/chuce/Downloads/"
-l_csv_filename =["AIS_2024_01_01.csv"]
+l_csv_filename = os.listdir(dataset_path+'AISVesselTracks2024/')
 #l_csv_filename =["Est-aruba_5x5deg_2018001_2018180.csv"]
 pkl_filename = "us_continent_2024_track.pkl"
 pkl_filename_train = "us_continent_2024_train_track.pkl"
@@ -174,19 +174,19 @@ pkl_filename_test  = "us_continent_2024_test_track.pkl"
 cargo_tanker_filename = "us_continent_2024_cargo_tanker.npy"
 
 t_train_min = time.mktime(time.strptime("2024-01-01T00:00:00", "%Y-%m-%dT%H:%M:%S"))
-t_train_max = time.mktime(time.strptime("2024-01-01T21:59:59", "%Y-%m-%dT%H:%M:%S"))
-t_valid_min = time.mktime(time.strptime("2024-01-01T22:00:00", "%Y-%m-%dT%H:%M:%S"))
-t_valid_max = time.mktime(time.strptime("2024-01-01T22:59:59", "%Y-%m-%dT%H:%M:%S"))
-t_test_min  = time.mktime(time.strptime("2024-01-01T23:00:00", "%Y-%m-%dT%H:%M:%S"))
-t_test_max  = time.mktime(time.strptime("2024-01-01T23:59:59", "%Y-%m-%dT%H:%M:%S"))
+t_train_max = time.mktime(time.strptime("2024-02-20T21:59:59", "%Y-%m-%dT%H:%M:%S"))
+t_valid_min = time.mktime(time.strptime("2024-02-21T22:00:00", "%Y-%m-%dT%H:%M:%S"))
+t_valid_max = time.mktime(time.strptime("2024-02-23T22:59:59", "%Y-%m-%dT%H:%M:%S"))
+t_test_min  = time.mktime(time.strptime("2024-02-24T23:00:00", "%Y-%m-%dT%H:%M:%S"))
+t_test_max  = time.mktime(time.strptime("2024-02-29T23:59:59", "%Y-%m-%dT%H:%M:%S"))
 
 t_min = time.mktime(time.strptime("2024-01-01T00:00:00", "%Y-%m-%dT%H:%M:%S"))
-t_max = time.mktime(time.strptime("2024-01-01T23:59:59", "%Y-%m-%dT%H:%M:%S"))
+t_max = time.mktime(time.strptime("2024-02-29T23:59:59", "%Y-%m-%dT%H:%M:%S"))
 
 #========================================================================
 LAT_RANGE = LAT_MAX - LAT_MIN
 LON_RANGE = LON_MAX - LON_MIN
-SOG_MAX = 50    #30.0  # the SOG is truncated to 30.0 knots max.
+SOG_MAX = 30    #30.0  # the SOG is truncated to 30.0 knots max.
 
 EPOCH = datetime(1970, 1, 1)
 LAT, LON, SOG, COG, HEADING, TIMESTAMP, MMSI, SHIPTYPE, LENGTH, WIDTH, CARGO  = list(range(11))
@@ -206,7 +206,7 @@ print(pkl_filename_train)
 l_l_msg = [] # list of AIS messages, each row is a message (list of AIS attributes)
 n_error = 0
 for csv_filename in l_csv_filename:
-    data_path = os.path.join(dataset_path,csv_filename)
+    data_path = os.path.join(dataset_path,'AISVesselTracks2024',csv_filename)
     with open(data_path,"r") as f:
         print("Reading ", csv_filename, "...")
         csvReader = csv.reader(f)
