@@ -8,3 +8,4 @@ runs/
 *.sh
 *.log
 *.ipynb
+.DS_Store
