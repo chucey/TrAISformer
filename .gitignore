@@ -6,3 +6,5 @@ __pycache__
 results/
 runs/
 *.sh
+*.log
+*.ipynb
