@@ -9,3 +9,5 @@ runs/
 *.log
 *.ipynb
 .DS_Store
+*.out
+*.err
