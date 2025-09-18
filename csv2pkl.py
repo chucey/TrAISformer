@@ -205,6 +205,7 @@ print(pkl_filename_train)
 #======================================
 l_l_msg = [] # list of AIS messages, each row is a message (list of AIS attributes)
 n_error = 0
+file_count = 1
 for csv_filename in l_csv_filename:
     data_path = os.path.join(dataset_path,'AISVesselTracks2024',csv_filename)
     with open(data_path,"r") as f:
@@ -215,8 +216,9 @@ for csv_filename in l_csv_filename:
         for row in csvReader:
 #             utc_time = datetime.strptime(row[8], "%Y-%m-%dT%H:%M:%S")
 #             timestamp = (utc_time - EPOCH).total_seconds()
-            print(count)
+            print(f'parsing file: {file_count} of {len(l_csv_filename)} line:',count)
             count += 1
+            file_count += 1
             try:
                 l_l_msg.append([float(row[2]),float(row[3]),
                                float(row[4]),float(row[5]),
