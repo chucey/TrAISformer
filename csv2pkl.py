@@ -163,7 +163,7 @@ t_max = time.mktime(time.strptime("31/01/2020 23:59:59", "%Y-%m-%dT%H:%M:%S"))
 # LON_MIN = -66.0
 # LON_MAX = -60.0
 
-dataset_path = "/Users/chuce/Downloads/"
+dataset_path = "/home/chucey/GQP/"
 l_csv_filename = os.listdir(dataset_path+'AISVesselTracks2024/')
 #l_csv_filename =["Est-aruba_5x5deg_2018001_2018180.csv"]
 pkl_filename = "us_continent_2024_track.pkl"
