@@ -12,3 +12,6 @@ runs/
 *.out
 *.err
 test_multiprocessing_fix.py
+test_optimized_preprocessing.py
+monitor_performance.py
+sampling_config_summary.py
