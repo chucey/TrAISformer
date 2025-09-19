@@ -11,3 +11,4 @@ runs/
 .DS_Store
 *.out
 *.err
+test_multiprocessing_fix.py
