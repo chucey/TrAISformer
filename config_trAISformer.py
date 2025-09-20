@@ -39,7 +39,7 @@ class Config():
     
     init_seqlen = 18
     max_seqlen = 120
-    min_seqlen = 10 # was 36
+    min_seqlen =  36
     
     dataset_name = "us_continent_2024" # "ct_dma", "us_continent", "us_eastcoast", "us_westcoast"
 
