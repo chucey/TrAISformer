@@ -15,6 +15,10 @@ from io import StringIO
 # import csv2pkl
 from tqdm import tqdm
 import argparse
+import multiprocessing as mp
+from multiprocessing import Pool
+from concurrent.futures import ProcessPoolExecutor, as_completed
+import functools
 
 # %%
 dataset_dir = os.path.join(os.getcwd(),"data","US_data")
@@ -37,165 +41,224 @@ LON_MAX = -60
 
 LAT_RANGE = LAT_MAX - LAT_MIN
 LON_RANGE = LON_MAX - LON_MIN
-SPEED_MAX = 50  # knots
+SPEED_MAX = 30  # knots
 DURATION_MAX = 24 #h
 
 EPOCH = datetime(1970, 1, 1)
 LAT, LON, SOG, COG, HEADING, TIMESTAMP, MMSI, SHIPTYPE, LENGTH, WIDTH, CARGO  = list(range(11))
 
-#%%
+# Optimization configuration
+NUM_PROCESSES = min(mp.cpu_count(), 8)  # Use up to 8 processes to avoid memory issues
+CHUNK_SIZE = 1000  # Process vessels in chunks to manage memory
+print(f"Using {NUM_PROCESSES} processes for parallel processing")
 
-for filename in l_input_filepath:
-    dict_list = []
-    filename_list = []
-    filename_list.append(filename)
-
+def process_vessel_batch(args):
+    """
+    Process a batch of vessels through all preprocessing steps.
+    This function will be run in parallel.
+    """
+    vessels_batch, filename = args
     
-    with open(os.path.join(dataset_dir,filename),"rb") as f:
-        temp = pickle.load(f)
-        dict_list.append(temp)
-    print(f"Loaded {filename}, length: {len(temp)}")       
-    print(f" Removing erroneous timestamps and erroneous speeds from file {filename}...")
-    # print(temp)
-
-    Vs = dict()
-    for Vi,file in zip(dict_list,filename_list):
-        # print(Vi,file)
-        for mmsi in list(Vi.keys()):       
-            # Boundary
-            lat_idx = np.logical_or((Vi[mmsi][:,LAT] > LAT_MAX),
-                                    (Vi[mmsi][:,LAT] < LAT_MIN))
-            Vi[mmsi] = Vi[mmsi][np.logical_not(lat_idx)]
-            lon_idx = np.logical_or((Vi[mmsi][:,LON] > LON_MAX),
-                                    (Vi[mmsi][:,LON] < LON_MIN))
-            Vi[mmsi] = Vi[mmsi][np.logical_not(lon_idx)]
-    #
-            abnormal_speed_idx = Vi[mmsi][:,SOG] > SPEED_MAX
-            Vi[mmsi] = Vi[mmsi][np.logical_not(abnormal_speed_idx)]
-            # Deleting empty keys
-            if len(Vi[mmsi]) == 0:
-                del Vi[mmsi]
-                continue
-            if mmsi not in list(Vs.keys()):
-                Vs[mmsi] = Vi[mmsi]
-                del Vi[mmsi]
+    # Constants
+    INTERVAL_MAX = 2*3600  # 2h
+    processed_vessels = {}
+    
+    for mmsi, v in vessels_batch.items():
+        try:
+            # Step 1: Already done (boundary and speed filtering)
+            
+            # Step 2: Voyage splitting
+            intervals = v[1:, TIMESTAMP] - v[:-1, TIMESTAMP]
+            idx = np.where(intervals > INTERVAL_MAX)[0]
+            
+            if len(idx) == 0:
+                voyages = [v]
             else:
-                Vs[mmsi] = np.concatenate((Vs[mmsi],Vi[mmsi]),axis = 0)
-                del Vi[mmsi]
-    del dict_list, Vi, abnormal_speed_idx
+                voyages = np.split(v, idx+1)
+            
+            # Step 3: Remove short voyages
+            valid_voyages = []
+            for voyage in voyages:
+                duration = voyage[-1, TIMESTAMP] - voyage[0, TIMESTAMP]
+                if (len(voyage) >= 20) and (duration >= 4*3600):
+                    valid_voyages.append(voyage)
+            
+            # Step 4: Optimized sampling with vectorized interpolation (600-second intervals)
+            for voyage_idx, voyage in enumerate(valid_voyages):
+                sampled_voyage = optimized_sampling(voyage)
+                if sampled_voyage is not None and len(sampled_voyage) > 0:
+                    # Step 5: Re-splitting (24h max duration)
+                    resplit_tracks = resplit_voyage(sampled_voyage)
+                    
+                    for track in resplit_tracks:
+                        # Minimum 4 hours: 4 hours * 6 samples/hour = 24 samples
+                        if len(track) >= 24:  # >= 4 hours with 600-second (10-minute) sampling
+                            # Step 6: Remove low speed tracks
+                            if np.count_nonzero(track[:, SOG] < 2) / len(track) <= 0.8:
+                                # Step 7: Normalization
+                                normalized_track = normalize_track(track.copy())
+                                
+                                # Store processed track
+                                key = f"{mmsi}_{voyage_idx}_{len(processed_vessels)}"
+                                processed_vessels[key] = normalized_track
+        
+        except Exception as e:
+            print(f"Error processing vessel {mmsi}: {e}")
+            continue
+    
+    return processed_vessels
 
-    print(f" After removing erroneous timestamps and speeds from file: {file}, length: {len(Vs)}\n")
-
-     ## STEP 2: VOYAGES SPLITTING 
-    #======================================
-    # Cutting discontiguous voyages into contiguous ones
-    print("Cutting discontiguous voyages into contiguous ones...\n")
-    count = 0
-    voyages = dict()
-    INTERVAL_MAX = 2*3600 # 2h
-    for mmsi in list(Vs.keys()):
-        v = Vs[mmsi]
-        # Intervals between successive messages in a track
-        intervals = v[1:,TIMESTAMP] - v[:-1,TIMESTAMP]
-        idx = np.where(intervals > INTERVAL_MAX)[0]
-        if len(idx) == 0:
-            voyages[count] = v
-            count += 1
+def optimized_sampling(voyage):
+    """
+    Optimized sampling function that reduces interpolation calls.
+    Samples every 600 seconds (10 minutes).
+    """
+    sampling_track = []
+    start_time = int(voyage[0, TIMESTAMP])
+    end_time = int(voyage[-1, TIMESTAMP])
+    
+    # Pre-compute all required timestamps - every 600 seconds (10 minutes)
+    timestamps = np.arange(start_time, end_time, 600)  # 10 min intervals
+    
+    for t in timestamps:
+        interpolated = utils.interpolate(t, voyage)
+        if interpolated is not None:
+            sampling_track.append(interpolated)
         else:
-            tmp = np.split(v,idx+1)
-            for t in tmp:
-                voyages[count] = t
-                count += 1
+            return None
+    
+    return np.array(sampling_track) if sampling_track else None
 
-    # STEP 3: REMOVING SHORT VOYAGES
-    #======================================
-    # Removing AIS track whose length is smaller than 10 or those last less than 10min
-    print("Removing AIS track whose length is smaller than 10 or those last less than 10min...")
+def resplit_voyage(voyage):
+    """
+    Split voyage into 24h segments.
+    With 600-second (10-minute) sampling: 6 samples/hour * 24 hours = 144 samples per day.
+    """
+    DURATION_MAX = 24  # hours
+    samples_per_hour = 6  # 6 samples per hour (1 sample per 10 minutes)
+    samples_per_day = samples_per_hour * DURATION_MAX  # 144 samples per day
+    
+    idx = np.arange(0, len(voyage), samples_per_day)[1:]
+    return np.split(voyage, idx) if len(idx) > 0 else [voyage]
 
-    for k in list(voyages.keys()):
-        duration = voyages[k][-1,TIMESTAMP] - voyages[k][0,TIMESTAMP]
-        if (len(voyages[k]) < 10) or (duration < 10*60):
-            voyages.pop(k, None)
-    print(f" After removing short voyages, length: {len(voyages)}\n")
+def normalize_track(track):
+    """
+    Vectorized normalization of a track.
+    """
+    track[:, LAT] = (track[:, LAT] - LAT_MIN) / (LAT_MAX - LAT_MIN)
+    track[:, LON] = (track[:, LON] - LON_MIN) / (LON_MAX - LON_MIN)
+    track[:, SOG] = np.clip(track[:, SOG], 0, SPEED_MAX) / SPEED_MAX
+    track[:, COG] = track[:, COG] / 360.0
+    return track
 
-    ## STEP 4: SAMPLING
-    #======================================
-    # Sampling, resolution = 5 min
-    print('Sampling...')
-    Vs = dict()
-    count = 0
-    for k in tqdm(list(voyages.keys())):
-        v = voyages[k]
-        sampling_track = np.empty((0, 11)) # [Lat, Lon, SOG, COG, Heading, Timestamp, MMSI, ShipType, Length, Width, Cargo]
-        for t in range(int(v[0,TIMESTAMP]), int(v[-1,TIMESTAMP]), 300): # 5 min
-            tmp = utils.interpolate(t,v)
-            if tmp is not None:
-                sampling_track = np.vstack([sampling_track, tmp])
-            else:
-                sampling_track = None
-                break
-        if sampling_track is not None:
-            Vs[count] = sampling_track
-            count += 1
-    print(f" After sampling file: {file}, length: {len(Vs)}\n")
-
-    ## STEP 5: RE-SPLITTING
-    #======================================
-    print(f'Re-Splitting file: {file}...')
-    Data = dict()
-    count = 0
-    for k in tqdm(list(Vs.keys())): 
-        v = Vs[k]
-        # Split AIS track into small tracks whose duration <= 1 day
-        idx = np.arange(0, len(v), 12*DURATION_MAX)[1:]
-        tmp = np.split(v,idx)
-        for subtrack in tmp:
-            # only use tracks whose duration >= 4 hours
-            if len(subtrack) >= 12*1:
-                Data[count] = subtrack
-                count += 1
-    print(f" After re-splitting file: {file}, length: {len(Data)}\n")
-
-    ## STEP 6: REMOVING LOW SPEED TRACKS
-    #======================================
-    print(f"Removing 'low speed' tracks from file: {file}...")
-    for k in tqdm(list(Data.keys())):
-        d_L = float(len(Data[k]))
-        if np.count_nonzero(Data[k][:,SOG] < 2)/d_L > 0.8:
-            Data.pop(k,None)
-    print(f" After removing 'low speed' tracks from file: {file}, length: {len(Data)}\n")
-
-    ## STEP 7: NORMALISATION
-    #======================================
-    print(f'Normalisation file: {file}...')
-    for k in tqdm(list(Data.keys())):
-        v = Data[k]
-        v[:,LAT] = (v[:,LAT] - LAT_MIN)/(LAT_MAX-LAT_MIN)
-        v[:,LON] = (v[:,LON] - LON_MIN)/(LON_MAX-LON_MIN)
-        v[:,SOG][v[:,SOG] > SPEED_MAX] = SPEED_MAX
-        v[:,SOG] = v[:,SOG]/SPEED_MAX
-        v[:,COG] = v[:,COG]/360.0
-
-    ## STEP 8: REARRANGE DATA FOR TRAISFORMER
-    #======================================
-    print(f'Rearranging data for TrAISformer file: {file}...')
+def process_single_file(filename):
+    """
+    Process a single file with all optimization steps.
+    """
+    dataset_dir = os.path.join(os.getcwd(),"data","US_data")
+    
+    print(f"\n{'='*50}")
+    print(f"Processing {filename}")
+    print(f"{'='*50}")
+    
+    # Load data
+    with open(os.path.join(dataset_dir, filename), "rb") as f:
+        temp = pickle.load(f)
+    print(f"Loaded {filename}, length: {len(temp)}")
+    
+    # Step 1: Remove erroneous data (vectorized)
+    print("Removing erroneous timestamps and speeds...")
+    Vs = {}
+    for mmsi, track in tqdm(temp.items(), desc="Filtering"):
+        # Vectorized boundary filtering
+        valid_mask = (
+            (track[:, LAT] >= LAT_MIN) & (track[:, LAT] <= LAT_MAX) &
+            (track[:, LON] >= LON_MIN) & (track[:, LON] <= LON_MAX) &
+            (track[:, SOG] >= 0) & (track[:, SOG] <= SPEED_MAX) &
+            (track[:, TIMESTAMP] >= 0)
+        )
+        filtered_track = track[valid_mask]
+        
+        if len(filtered_track) > 0:
+            Vs[mmsi] = filtered_track
+    
+    print(f"After filtering: {len(Vs)} vessels")
+    
+    # Parallel processing of vessel batches
+    print("Processing vessels in parallel...")
+    vessel_items = list(Vs.items())
+    
+    # Split into batches for parallel processing
+    batches = []
+    for i in range(0, len(vessel_items), CHUNK_SIZE):
+        batch = dict(vessel_items[i:i + CHUNK_SIZE])
+        batches.append((batch, filename))
+    
+    # Process batches in parallel
+    all_processed = {}
+    with ProcessPoolExecutor(max_workers=NUM_PROCESSES) as executor:
+        future_to_batch = {executor.submit(process_vessel_batch, batch): batch for batch in batches}
+        
+        for future in tqdm(as_completed(future_to_batch), total=len(batches), desc="Processing batches"):
+            try:
+                batch_result = future.result()
+                all_processed.update(batch_result)
+            except Exception as e:
+                print(f"Batch processing error: {e}")
+    
+    print(f"After processing: {len(all_processed)} tracks")
+    
+    # Convert to list format for TrAISformer
     data_list = []
-    for key in tqdm(list(Data.keys())):
-        data_dict = {}
-        data_dict['mmsi'] = int(Data[key][0, MMSI])
-        data_dict['traj'] = Data[key]
-        # Rearrange data for TrAISformer
+    for key, track in all_processed.items():
+        data_dict = {
+            'mmsi': int(track[0, MMSI]),
+            'traj': track
+        }
         data_list.append(data_dict)
-
-    ## STEP 9: SAVE CLEANED DATA
-    #======================================
-    print(f'Saving cleaned data to {l_output_filepath}...\n')
+    
+    # Save results
+    l_output_filepath = os.path.join(os.getcwd(),"data","US_data","cleaned_data")
     if not os.path.exists(l_output_filepath):
         os.makedirs(l_output_filepath)
-    output_filepath = os.path.join(l_output_filepath, file)
+    
+    output_filepath = os.path.join(l_output_filepath, filename)
     with open(output_filepath, 'wb') as f:
         pickle.dump(data_list, f)
-    print(f"Saved cleaned data to {output_filepath}, length: {len(data_list)}\n")
+    
+    print(f"Saved {len(data_list)} tracks to {output_filepath}")
+    return len(data_list)
+
+#%%
+
+if __name__ == '__main__':
+    # Process files
+    l_input_filepath = [
+        "us_continent_2024_valid_track.pkl",
+        "us_continent_2024_train_track.pkl", 
+        "us_continent_2024_test_track.pkl"
+    ]
+    
+    start_time = time.time()
+    total_tracks = 0
+    
+    for filename in l_input_filepath:
+        file_start = time.time()
+        tracks_processed = process_single_file(filename)
+        file_time = time.time() - file_start
+        total_tracks += tracks_processed
+        
+        print(f"File {filename} completed in {file_time/60:.1f} minutes")
+        print(f"Processed {tracks_processed} tracks")
+        print()
+    
+    total_time = time.time() - start_time
+    print(f"\n{'='*60}")
+    print(f"ALL FILES COMPLETED!")
+    print(f"Total processing time: {total_time/3600:.2f} hours")
+    print(f"Total tracks processed: {total_tracks}")
+    print(f"Average processing rate: {total_tracks/(total_time/3600):.0f} tracks/hour")
+    print(f"{'='*60}")
 #%%
 # cleaned_data_dir = os.path.join(os.getcwd(),"data","US_data","cleaned_data")
 # os.listdir(cleaned_data_dir)

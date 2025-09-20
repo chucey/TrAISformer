@@ -226,17 +226,19 @@ class Trainer:
 
                     # tb logging
                     if TB_LOG:
-                        tb.add_scalar("loss",
+                         from torch.utils.tensorboard import SummaryWriter
+                         tb = SummaryWriter()
+                         tb.add_scalar("loss",
                                       loss.item(),
                                       epoch * n_batches + it)
-                        tb.add_scalar("lr",
+                         tb.add_scalar("lr",
                                       lr,
                                       epoch * n_batches + it)
 
-                        for name, params in model.head.named_parameters():
+                         for name, params in model.head.named_parameters():
                             tb.add_histogram(f"head.{name}", params, epoch * n_batches + it)
                             tb.add_histogram(f"head.{name}.grad", params.grad, epoch * n_batches + it)
-                        if model.mode in ("gridcont_real",):
+                         if model.mode in ("gridcont_real",):
                             for name, params in model.res_pred.named_parameters():
                                 tb.add_histogram(f"res_pred.{name}", params, epoch * n_batches + it)
                                 tb.add_histogram(f"res_pred.{name}.grad", params.grad, epoch * n_batches + it)
@@ -279,7 +281,7 @@ class Trainer:
             # ==========================================================================================
             # ==========================================================================================
             raw_model = model.module if hasattr(self.model, "module") else model
-            seqs, masks, seqlens, mmsis, time_starts = iter(aisdls["test"]).next()
+            seqs, masks, seqlens, mmsis, time_starts = next(iter(aisdls["test"]))
             n_plots = 7
             init_seqlen = INIT_SEQLEN
             seqs_init = seqs[:n_plots, :init_seqlen, :].to(self.device)
@@ -307,8 +309,12 @@ class Trainer:
                 plt.plot(inputs_np[idx][:init_seqlen, 1], inputs_np[idx][:init_seqlen, 0], "o", markersize=3, color=c)
                 plt.plot(inputs_np[idx][:seqlen, 1], inputs_np[idx][:seqlen, 0], linestyle="-.", color=c)
                 plt.plot(preds_np[idx][init_seqlen:, 1], preds_np[idx][init_seqlen:, 0], "x", markersize=4, color=c)
-            plt.xlim([-0.05, 1.05])
-            plt.ylim([-0.05, 1.05])
+            plt.ylabel("Latitude (normalized)")
+            plt.xlabel("Longitude (normalized)")
+            plt.title(f"Epoch {epoch + 1:03d} predictions (x: sampled, o: input, -.: full input)")
+            plt.grid()
+            plt.ylim([0.23, 0.255])
+            plt.xlim([0.645, 0.665])
             plt.savefig(img_path, dpi=150)
             plt.close()
 

@@ -163,8 +163,8 @@ t_max = time.mktime(time.strptime("31/01/2020 23:59:59", "%Y-%m-%dT%H:%M:%S"))
 # LON_MIN = -66.0
 # LON_MAX = -60.0
 
-dataset_path = "/Users/chuce/Downloads/"
-l_csv_filename =["AIS_2024_01_01.csv"]
+dataset_path = "/home/chucey/GQP/"
+l_csv_filename = os.listdir(dataset_path+'AISVesselTracks2024/')
 #l_csv_filename =["Est-aruba_5x5deg_2018001_2018180.csv"]
 pkl_filename = "us_continent_2024_track.pkl"
 pkl_filename_train = "us_continent_2024_train_track.pkl"
@@ -174,19 +174,19 @@ pkl_filename_test  = "us_continent_2024_test_track.pkl"
 cargo_tanker_filename = "us_continent_2024_cargo_tanker.npy"
 
 t_train_min = time.mktime(time.strptime("2024-01-01T00:00:00", "%Y-%m-%dT%H:%M:%S"))
-t_train_max = time.mktime(time.strptime("2024-01-01T21:59:59", "%Y-%m-%dT%H:%M:%S"))
-t_valid_min = time.mktime(time.strptime("2024-01-01T22:00:00", "%Y-%m-%dT%H:%M:%S"))
-t_valid_max = time.mktime(time.strptime("2024-01-01T22:59:59", "%Y-%m-%dT%H:%M:%S"))
-t_test_min  = time.mktime(time.strptime("2024-01-01T23:00:00", "%Y-%m-%dT%H:%M:%S"))
-t_test_max  = time.mktime(time.strptime("2024-01-01T23:59:59", "%Y-%m-%dT%H:%M:%S"))
+t_train_max = time.mktime(time.strptime("2024-02-20T21:59:59", "%Y-%m-%dT%H:%M:%S"))
+t_valid_min = time.mktime(time.strptime("2024-02-21T22:00:00", "%Y-%m-%dT%H:%M:%S"))
+t_valid_max = time.mktime(time.strptime("2024-02-23T22:59:59", "%Y-%m-%dT%H:%M:%S"))
+t_test_min  = time.mktime(time.strptime("2024-02-24T23:00:00", "%Y-%m-%dT%H:%M:%S"))
+t_test_max  = time.mktime(time.strptime("2024-02-29T23:59:59", "%Y-%m-%dT%H:%M:%S"))
 
 t_min = time.mktime(time.strptime("2024-01-01T00:00:00", "%Y-%m-%dT%H:%M:%S"))
-t_max = time.mktime(time.strptime("2024-01-01T23:59:59", "%Y-%m-%dT%H:%M:%S"))
+t_max = time.mktime(time.strptime("2024-02-29T23:59:59", "%Y-%m-%dT%H:%M:%S"))
 
 #========================================================================
 LAT_RANGE = LAT_MAX - LAT_MIN
 LON_RANGE = LON_MAX - LON_MIN
-SOG_MAX = 50    #30.0  # the SOG is truncated to 30.0 knots max.
+SOG_MAX = 30    #30.0  # the SOG is truncated to 30.0 knots max.
 
 EPOCH = datetime(1970, 1, 1)
 LAT, LON, SOG, COG, HEADING, TIMESTAMP, MMSI, SHIPTYPE, LENGTH, WIDTH, CARGO  = list(range(11))
@@ -205,8 +205,9 @@ print(pkl_filename_train)
 #======================================
 l_l_msg = [] # list of AIS messages, each row is a message (list of AIS attributes)
 n_error = 0
+file_count = 1
 for csv_filename in l_csv_filename:
-    data_path = os.path.join(dataset_path,csv_filename)
+    data_path = os.path.join(dataset_path,'AISVesselTracks2024',csv_filename)
     with open(data_path,"r") as f:
         print("Reading ", csv_filename, "...")
         csvReader = csv.reader(f)
@@ -215,8 +216,9 @@ for csv_filename in l_csv_filename:
         for row in csvReader:
 #             utc_time = datetime.strptime(row[8], "%Y-%m-%dT%H:%M:%S")
 #             timestamp = (utc_time - EPOCH).total_seconds()
-            print(count)
+            print(f'parsing file: {file_count} of {len(l_csv_filename)} line:',count)
             count += 1
+            
             try:
                 l_l_msg.append([float(row[2]),float(row[3]),
                                float(row[4]),float(row[5]),
@@ -228,6 +230,7 @@ for csv_filename in l_csv_filename:
             except:
                 n_error += 1
                 continue
+        file_count += 1
 
 
 m_msg = np.array(l_l_msg)
@@ -239,6 +242,10 @@ print("Lon min: ",np.min(m_msg[:,LON]), "Lon max: ",np.max(m_msg[:,LON]))
 print("SOG min: ",np.min(m_msg[:,SOG]), "SOG max: ",np.max(m_msg[:,SOG]))
 print("COG min: ",np.min(m_msg[:,COG]), "COG max: ",np.max(m_msg[:,COG]))
 print("Ts min: ",np.min(m_msg[:,TIMESTAMP]), "Ts max: ",np.max(m_msg[:,TIMESTAMP]))
+
+print("Saving all AIS messages to .npy file", " ...")
+np.save(os.path.join('data', 'US_data','all_msgs.npy'),m_msg)
+
 
 # if m_msg[0,TIMESTAMP] > 1584720228: 
 #     m_msg[:,TIMESTAMP] = m_msg[:,TIMESTAMP]/1000 # Convert to suitable timestamp format
@@ -275,146 +282,146 @@ print("Ts min: ",np.min(m_msg[:,TIMESTAMP]), "Ts max: ",np.max(m_msg[:,TIMESTAMP
 #     VesselTypes[mmsi_] = np.sort(VesselTypes[mmsi_])
     
 # l_cargo_tanker = []
-# l_fishing = []
-# for mmsi_ in list(VesselTypes.keys()):
-#     if sublist(VesselTypes[mmsi_], list(range(70,80))) or sublist(VesselTypes[mmsi_], list(range(80,90))):
-#         l_cargo_tanker.append(mmsi_)
-#     if sublist(VesselTypes[mmsi_], [30]):
-#         l_fishing.append(mmsi_)
+# # l_fishing = []
+# # for mmsi_ in list(VesselTypes.keys()):
+# #     if sublist(VesselTypes[mmsi_], list(range(70,80))) or sublist(VesselTypes[mmsi_], list(range(80,90))):
+# #         l_cargo_tanker.append(mmsi_)
+# #     if sublist(VesselTypes[mmsi_], [30]):
+# #         l_fishing.append(mmsi_)
 
 
-# print("Total number of vessels: ",len(VesselTypes))
-# print("Total number of cargos/tankers: ",len(l_cargo_tanker))
-# print("Total number of fishing: ",len(l_fishing))
+# # print("Total number of vessels: ",len(VesselTypes))
+# # print("Total number of cargos/tankers: ",len(l_cargo_tanker))
+# # print("Total number of fishing: ",len(l_fishing))
 
-# print("Saving vessels' type list to ", cargo_tanker_filename)
-# np.save(cargo_tanker_filename,l_cargo_tanker)
-# np.save(cargo_tanker_filename.replace("_cargo_tanker.npy","_fishing.npy"),l_fishing)
-
-
-## FILTERING 
-#======================================
-# Selecting AIS messages in the ROI and in the period of interest.
-
-## LAT LON
-m_msg = m_msg[m_msg[:,LAT]>=LAT_MIN]
-m_msg = m_msg[m_msg[:,LAT]<=LAT_MAX]
-m_msg = m_msg[m_msg[:,LON]>=LON_MIN]
-m_msg = m_msg[m_msg[:,LON]<=LON_MAX]
-# SOG
-m_msg = m_msg[m_msg[:,SOG]>=0]
-m_msg = m_msg[m_msg[:,SOG]<=SOG_MAX]
-# COG
-m_msg = m_msg[m_msg[:,SOG]>=0]
-m_msg = m_msg[m_msg[:,COG]<=360]
-# D2C
-# m_msg = m_msg[m_msg[:,D2C]>=D2C_MIN]
-
-# TIME
-m_msg = m_msg[m_msg[:,TIMESTAMP]>=0]
-
-m_msg = m_msg[m_msg[:,TIMESTAMP]>=t_min]
-m_msg = m_msg[m_msg[:,TIMESTAMP]<=t_max]
-
-m_msg_train = m_msg[m_msg[:,TIMESTAMP]>=t_train_min]
-m_msg_train = m_msg_train[m_msg_train[:,TIMESTAMP]<=t_train_max]
-unique_m_msg_train_mmsi = set(m_msg_train[:, MMSI])
-
-m_msg_valid = m_msg[m_msg[:,TIMESTAMP]>=t_valid_min]
-m_msg_valid = m_msg_valid[m_msg_valid[:,TIMESTAMP]<=t_valid_max]
-unique_m_msg_valid_mmsi = set(m_msg_valid[:, MMSI])
-
-m_msg_test  = m_msg[m_msg[:,TIMESTAMP]>=t_test_min]
-m_msg_test  = m_msg_test[m_msg_test[:,TIMESTAMP]<=t_test_max]
-unique_m_msg_test_mmsi = set(m_msg_test[:, MMSI])
-
-print("Total msgs: ",len(m_msg))
-print("Number of msgs in the training set: ",len(m_msg_train))
-print("number of unique mmsi training set", len(unique_m_msg_train_mmsi))
-print("Number of msgs in the validation set: ",len(m_msg_valid))
-print("number of unique mmsi validation set", len(unique_m_msg_valid_mmsi))
-print("Number of msgs in the test set: ",len(m_msg_test))
-print("number of unique mmsi test set", len(unique_m_msg_test_mmsi))
+# # print("Saving vessels' type list to ", cargo_tanker_filename)
+# # np.save(cargo_tanker_filename,l_cargo_tanker)
+# # np.save(cargo_tanker_filename.replace("_cargo_tanker.npy","_fishing.npy"),l_fishing)
 
 
-## MERGING INTO DICT
-#======================================
-# Creating AIS tracks from the list of AIS messages.
-# Each AIS track is formatted by a dictionary.
-print("Convert to dicts of vessel's tracks...")
+# ## FILTERING 
+# #======================================
+# # Selecting AIS messages in the ROI and in the period of interest.
 
-#
+# ## LAT LON
+# m_msg = m_msg[m_msg[:,LAT]>=LAT_MIN]
+# m_msg = m_msg[m_msg[:,LAT]<=LAT_MAX]
+# m_msg = m_msg[m_msg[:,LON]>=LON_MIN]
+# m_msg = m_msg[m_msg[:,LON]<=LON_MAX]
+# # SOG
+# m_msg = m_msg[m_msg[:,SOG]>=0]
+# m_msg = m_msg[m_msg[:,SOG]<=SOG_MAX]
+# # COG
+# m_msg = m_msg[m_msg[:,SOG]>=0]
+# m_msg = m_msg[m_msg[:,COG]<=360]
+# # D2C
+# # m_msg = m_msg[m_msg[:,D2C]>=D2C_MIN]
 
-# Training set
-Vs_train = dict()
-for v_msg in tqdm(m_msg_train):
-    mmsi = int(v_msg[MMSI])
-    if not (mmsi in list(Vs_train.keys())):
-        Vs_train[mmsi] = np.empty((0,11))
-    Vs_train[mmsi] = np.concatenate((Vs_train[mmsi], np.expand_dims(v_msg[:11],0)), axis = 0)
-for key in tqdm(list(Vs_train.keys())):
-    if CARGO_TANKER_ONLY and (not key in l_cargo_tanker):
-        del Vs_train[key]
-    else:
-        Vs_train[key] = np.array(sorted(Vs_train[key], key=lambda m_entry: m_entry[TIMESTAMP]))     
+# # TIME
+# m_msg = m_msg[m_msg[:,TIMESTAMP]>=0]
 
-# Vs_train_list = []
-# for item in tqdm(unique_m_msg_train_mmsi):
-#     Vs_train = dict()
-#     item = int(item)
-#     Vs_train['mmsi'] = item
-#     Vs_train['traj'] = m_msg_train[m_msg_train[:,MMSI]==item]
-#     Vs_train_list.append(Vs_train)
+# m_msg = m_msg[m_msg[:,TIMESTAMP]>=t_min]
+# m_msg = m_msg[m_msg[:,TIMESTAMP]<=t_max]
 
-# Validation set
-Vs_valid = dict()
-for v_msg in tqdm(m_msg_valid):
-    mmsi = int(v_msg[MMSI])
-    if not (mmsi in list(Vs_valid.keys())):
-        Vs_valid[mmsi] = np.empty((0,11))
-    Vs_valid[mmsi] = np.concatenate((Vs_valid[mmsi], np.expand_dims(v_msg[:11],0)), axis = 0)
-for key in tqdm(list(Vs_valid.keys())):
-    if CARGO_TANKER_ONLY and (not key in l_cargo_tanker):
-        del Vs_valid[key]
-    else:
-        Vs_valid[key] = np.array(sorted(Vs_valid[key], key=lambda m_entry: m_entry[TIMESTAMP]))
+# m_msg_train = m_msg[m_msg[:,TIMESTAMP]>=t_train_min]
+# m_msg_train = m_msg_train[m_msg_train[:,TIMESTAMP]<=t_train_max]
+# unique_m_msg_train_mmsi = set(m_msg_train[:, MMSI])
 
-# Vs_valid_list = []
-# for item in tqdm(unique_m_msg_valid_mmsi):
-#     Vs_valid = dict()
-#     item = int(item)
-#     Vs_valid['mmsi'] = item
-#     Vs_valid['traj'] = m_msg_valid[m_msg_valid[:,MMSI]==item]
-#     Vs_valid_list.append(Vs_valid)
+# m_msg_valid = m_msg[m_msg[:,TIMESTAMP]>=t_valid_min]
+# m_msg_valid = m_msg_valid[m_msg_valid[:,TIMESTAMP]<=t_valid_max]
+# unique_m_msg_valid_mmsi = set(m_msg_valid[:, MMSI])
 
-# Test set
-Vs_test = dict()
-for v_msg in tqdm(m_msg_test):
-    mmsi = int(v_msg[MMSI])
-    if not (mmsi in list(Vs_test.keys())):
-        Vs_test[mmsi] = np.empty((0,11))
-    Vs_test[mmsi] = np.concatenate((Vs_test[mmsi], np.expand_dims(v_msg[:11],0)), axis = 0)
-for key in tqdm(list(Vs_test.keys())):
-    if CARGO_TANKER_ONLY and (not key in l_cargo_tanker):
-        del Vs_test[key]
-    else:
-        Vs_test[key] = np.array(sorted(Vs_test[key], key=lambda m_entry: m_entry[TIMESTAMP]))
+# m_msg_test  = m_msg[m_msg[:,TIMESTAMP]>=t_test_min]
+# m_msg_test  = m_msg_test[m_msg_test[:,TIMESTAMP]<=t_test_max]
+# unique_m_msg_test_mmsi = set(m_msg_test[:, MMSI])
 
-# Vs_test_list = []
-# for item in tqdm(unique_m_msg_test_mmsi):
-#     Vs_test = dict()
-#     item = int(item)
-#     Vs_test['mmsi'] = item
-#     Vs_test['traj'] = m_msg_test[m_msg_test[:,MMSI]==item]
-#     Vs_test_list.append(Vs_test)
+# print("Total msgs: ",len(m_msg))
+# print("Number of msgs in the training set: ",len(m_msg_train))
+# print("number of unique mmsi training set", len(unique_m_msg_train_mmsi))
+# print("Number of msgs in the validation set: ",len(m_msg_valid))
+# print("number of unique mmsi validation set", len(unique_m_msg_valid_mmsi))
+# print("Number of msgs in the test set: ",len(m_msg_test))
+# print("number of unique mmsi test set", len(unique_m_msg_test_mmsi))
 
-## PICKLING
-#======================================
-for filename, filedict in zip([pkl_filename_train,pkl_filename_valid,pkl_filename_test],
-                              [Vs_train,Vs_valid,Vs_test]
-                             ):
-    print("Writing to ", os.path.join('data', 'US_data',filename),"...")
-    with open(os.path.join('data', 'US_data',filename),"wb") as f:
-        pickle.dump(filedict,f)
-    print("Total number of tracks: ", len(filedict))
+
+# ## MERGING INTO DICT
+# #======================================
+# # Creating AIS tracks from the list of AIS messages.
+# # Each AIS track is formatted by a dictionary.
+# print("Convert to dicts of vessel's tracks...")
+
+# #
+
+# # Training set
+# Vs_train = dict()
+# for v_msg in tqdm(m_msg_train):
+#     mmsi = int(v_msg[MMSI])
+#     if not (mmsi in list(Vs_train.keys())):
+#         Vs_train[mmsi] = np.empty((0,11))
+#     Vs_train[mmsi] = np.concatenate((Vs_train[mmsi], np.expand_dims(v_msg[:11],0)), axis = 0)
+# for key in tqdm(list(Vs_train.keys())):
+#     if CARGO_TANKER_ONLY and (not key in l_cargo_tanker):
+#         del Vs_train[key]
+#     else:
+#         Vs_train[key] = np.array(sorted(Vs_train[key], key=lambda m_entry: m_entry[TIMESTAMP]))     
+
+# # Vs_train_list = []
+# # for item in tqdm(unique_m_msg_train_mmsi):
+# #     Vs_train = dict()
+# #     item = int(item)
+# #     Vs_train['mmsi'] = item
+# #     Vs_train['traj'] = m_msg_train[m_msg_train[:,MMSI]==item]
+# #     Vs_train_list.append(Vs_train)
+
+# # Validation set
+# Vs_valid = dict()
+# for v_msg in tqdm(m_msg_valid):
+#     mmsi = int(v_msg[MMSI])
+#     if not (mmsi in list(Vs_valid.keys())):
+#         Vs_valid[mmsi] = np.empty((0,11))
+#     Vs_valid[mmsi] = np.concatenate((Vs_valid[mmsi], np.expand_dims(v_msg[:11],0)), axis = 0)
+# for key in tqdm(list(Vs_valid.keys())):
+#     if CARGO_TANKER_ONLY and (not key in l_cargo_tanker):
+#         del Vs_valid[key]
+#     else:
+#         Vs_valid[key] = np.array(sorted(Vs_valid[key], key=lambda m_entry: m_entry[TIMESTAMP]))
+
+# # Vs_valid_list = []
+# # for item in tqdm(unique_m_msg_valid_mmsi):
+# #     Vs_valid = dict()
+# #     item = int(item)
+# #     Vs_valid['mmsi'] = item
+# #     Vs_valid['traj'] = m_msg_valid[m_msg_valid[:,MMSI]==item]
+# #     Vs_valid_list.append(Vs_valid)
+
+# # Test set
+# Vs_test = dict()
+# for v_msg in tqdm(m_msg_test):
+#     mmsi = int(v_msg[MMSI])
+#     if not (mmsi in list(Vs_test.keys())):
+#         Vs_test[mmsi] = np.empty((0,11))
+#     Vs_test[mmsi] = np.concatenate((Vs_test[mmsi], np.expand_dims(v_msg[:11],0)), axis = 0)
+# for key in tqdm(list(Vs_test.keys())):
+#     if CARGO_TANKER_ONLY and (not key in l_cargo_tanker):
+#         del Vs_test[key]
+#     else:
+#         Vs_test[key] = np.array(sorted(Vs_test[key], key=lambda m_entry: m_entry[TIMESTAMP]))
+
+# # Vs_test_list = []
+# # for item in tqdm(unique_m_msg_test_mmsi):
+# #     Vs_test = dict()
+# #     item = int(item)
+# #     Vs_test['mmsi'] = item
+# #     Vs_test['traj'] = m_msg_test[m_msg_test[:,MMSI]==item]
+# #     Vs_test_list.append(Vs_test)
+
+# ## PICKLING
+# #======================================
+# for filename, filedict in zip([pkl_filename_train,pkl_filename_valid,pkl_filename_test],
+#                               [Vs_train,Vs_valid,Vs_test]
+#                              ):
+#     print("Writing to ", os.path.join('data', 'US_data',filename),"...")
+#     with open(os.path.join('data', 'US_data',filename),"wb") as f:
+#         pickle.dump(filedict,f)
+#     print("Total number of tracks: ", len(filedict))
 

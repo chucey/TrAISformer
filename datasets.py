@@ -36,9 +36,9 @@ class AISDataset(Dataset):
             l_data: list of dictionaries, each element is an AIS trajectory. 
                 l_data[idx]["mmsi"]: vessel's MMSI.
                 l_data[idx]["traj"]: a matrix whose columns are 
-                    [LAT, LON, SOG, COG, TIMESTAMP]
+                    [LAT, LON, SOG, COG, HEADING, TIMESTAMP, MMSI, SHIPTYPE, LENGTH, WIDTH, CARGO]
                 lat, lon, sog, and cod have been standardized, i.e. range = [0,1).
-            max_seqlen: (optional) max sequence length. Default is
+            max_seqlen: (optional) max sequence length. Default is 96
         """    
             
         self.max_seqlen = max_seqlen
@@ -74,7 +74,7 @@ class AISDataset(Dataset):
         
         seqlen = torch.tensor(seqlen, dtype=torch.int)
         mmsi =  torch.tensor(V["mmsi"], dtype=torch.int)
-        time_start = torch.tensor(V["traj"][0,4], dtype=torch.int)
+        time_start = torch.tensor(V["traj"][0,5], dtype=torch.int)
         
         return seq , mask, seqlen, mmsi, time_start
     
@@ -94,7 +94,7 @@ class AISDataset_grad(Dataset):
             l_data: list of dictionaries, each element is an AIS trajectory. 
                 l_data[idx]["mmsi"]: vessel's MMSI.
                 l_data[idx]["traj"]: a matrix whose columns are 
-                    [LAT, LON, SOG, COG, TIMESTAMP]
+                    [LAT, LON, SOG, COG, HEADING, TIMESTAMP, MMSI, SHIPTYPE, LENGTH, WIDTH, CARGO]
                 lat, lon, sog, and cod have been standardized, i.e. range = [0,1).
             dlat_max, dlon_max: the maximum value of the gradient of the positions.
                 dlat_max = max(lat[idx+1]-lat[idx]) for all idx.
@@ -145,6 +145,6 @@ class AISDataset_grad(Dataset):
         
         seqlen = torch.tensor(seqlen, dtype=torch.int)
         mmsi =  torch.tensor(V["mmsi"], dtype=torch.int)
-        time_start = torch.tensor(V["traj"][0,4], dtype=torch.int)
+        time_start = torch.tensor(V["traj"][0,5], dtype=torch.int)
         
         return seq , mask, seqlen, mmsi, time_start
