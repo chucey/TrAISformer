@@ -103,7 +103,8 @@ if __name__ == "__main__":
             shuffle = True
         aisdls[phase] = DataLoader(aisdatasets[phase],
                                    batch_size=cf.batch_size,
-                                   shuffle=shuffle)
+                                   shuffle=shuffle,
+                                   )
     cf.final_tokens = 2 * len(aisdatasets["train"]) * cf.max_seqlen
 
     ## Model
