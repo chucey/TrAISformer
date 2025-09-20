@@ -190,7 +190,7 @@ if __name__ == "__main__":
     plt.xlabel("Time (hours)")
     plt.ylabel("Prediction errors (km)")
     plt.xlim([0, 12])
-    plt.ylim([0, 20])
+    plt.ylim([0, 5])
     # plt.ylim([0,pred_errors.max()+0.5])
     plt.savefig(cf.savedir + "prediction_error.png")
 
