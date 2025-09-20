@@ -33,7 +33,7 @@ class Config():
         device = torch.device("cpu")
     print(f"Using device: {device}")
 
-    max_epochs = 8
+    max_epochs = 20
     batch_size = 32
     n_samples = 16
     
