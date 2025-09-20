@@ -33,7 +33,7 @@ class Config():
         device = torch.device("cpu")
     print(f"Using device: {device}")
 
-    max_epochs = 10
+    max_epochs = 8
     batch_size = 32
     n_samples = 16
     
@@ -111,7 +111,7 @@ class Config():
     lr_decay = True
     warmup_tokens = 512*20 # these two numbers come from the GPT-3 paper, but may not be good defaults elsewhere
     final_tokens = 260e9 # (at what point we reach 10% of original LR)
-    num_workers = 4 # for DataLoader
+    num_workers = 2 # for DataLoader
     
     filename = f"{dataset_name}"\
         + f"-{mode}-{sample_mode}-{top_k}-{r_vicinity}"\
