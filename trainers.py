@@ -305,12 +305,16 @@ class Trainer:
                     seqlen = seqlens[idx].item()
                 except:
                     continue
-                plt.plot(inputs_np[idx][:init_seqlen, 1], inputs_np[idx][:init_seqlen, 0], color=c)
-                plt.plot(inputs_np[idx][:init_seqlen, 1], inputs_np[idx][:init_seqlen, 0], "o", markersize=3, color=c)
-                plt.plot(inputs_np[idx][:seqlen, 1], inputs_np[idx][:seqlen, 0], linestyle="-.", color=c)
-                plt.plot(preds_np[idx][init_seqlen:, 1], preds_np[idx][init_seqlen:, 0], "x", markersize=4, color=c)
-            plt.xlim([-0.05, 1.05])
-            plt.ylim([-0.05, 1.05])
+                plt.plot(inputs_np[idx][:init_seqlen, 0], inputs_np[idx][:init_seqlen, 1], color=c)
+                plt.plot(inputs_np[idx][:init_seqlen, 0], inputs_np[idx][:init_seqlen, 1], "o", markersize=3, color=c)
+                plt.plot(inputs_np[idx][:seqlen, 0], inputs_np[idx][:seqlen, 1], linestyle="-.", color=c)
+                plt.plot(preds_np[idx][init_seqlen:, 0], preds_np[idx][init_seqlen:, 1], "x", markersize=4, color=c)
+            plt.xlabel("Latitude (normalized)")
+            plt.ylabel("Longitude (normalized)")
+            plt.title(f"Epoch {epoch + 1:03d} predictions (x: sampled, o: input, -.: full input)")
+            plt.grid()
+            # plt.xlim([-0.05, 1.05])
+            # plt.ylim([-0.05, 1.05])
             plt.savefig(img_path, dpi=150)
             plt.close()
 
