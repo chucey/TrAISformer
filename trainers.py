@@ -313,8 +313,8 @@ class Trainer:
             plt.ylabel("Longitude (normalized)")
             plt.title(f"Epoch {epoch + 1:03d} predictions (x: sampled, o: input, -.: full input)")
             plt.grid()
-            # plt.xlim([-0.05, 1.05])
-            # plt.ylim([-0.05, 1.05])
+            plt.xlim([0.22, 0.27])
+            plt.ylim([0.64, 0.68])
             plt.savefig(img_path, dpi=150)
             plt.close()
 
