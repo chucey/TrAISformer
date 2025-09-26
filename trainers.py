@@ -163,7 +163,7 @@ class Trainer:
             is_train = split == 'Training'
             model.train(is_train)
             data = self.train_dataset if is_train else self.test_dataset
-            loader = DataLoader(data, shuffle=True, pin_memory=True,
+            loader = DataLoader(data, shuffle=True, pin_memory=False,
                                 batch_size=config.batch_size,
                                 num_workers=config.num_workers)
 

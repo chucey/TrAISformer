@@ -126,8 +126,8 @@ if __name__ == "__main__":
     # Load the best model
     model.load_state_dict(torch.load(cf.ckpt_path))
 
-    v_ranges = torch.tensor([2, 3, 0, 0]).to(cf.device)
-    v_roi_min = torch.tensor([model.lat_min, -7, 0, 0]).to(cf.device)
+    v_ranges = torch.tensor([(model.lat_max - model.lat_min), (model.lon_max - model.lon_min), 0, 0]).to(cf.device)
+    v_roi_min = torch.tensor([model.lat_min, model.lon_min, 0, 0]).to(cf.device)
     max_seqlen = init_seqlen + 6 * 4
 
     model.eval()
@@ -189,8 +189,8 @@ if __name__ == "__main__":
     plt.text(3.12, pred_errors[timestep] - 0.5, "{:.4f}".format(pred_errors[timestep]), fontsize=10)
     plt.xlabel("Time (hours)")
     plt.ylabel("Prediction errors (km)")
-    plt.xlim([0, 12])
-    plt.ylim([0, 5])
+    # plt.xlim([0, 12])
+    # plt.ylim([0, 5])
     # plt.ylim([0,pred_errors.max()+0.5])
     plt.savefig(cf.savedir + "prediction_error.png")
 
