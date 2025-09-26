@@ -23,7 +23,7 @@ import torch
 
 class Config():
     retrain = True
-    tb_log = True
+    tb_log = False
 
     if torch.backends.mps.is_available():
         device = torch.device("mps")
