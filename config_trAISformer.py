@@ -33,8 +33,8 @@ class Config():
         device = torch.device("cpu")
     print(f"Using device: {device}")
 
-    max_epochs = 50
-    batch_size = 16
+    max_epochs = 100
+    batch_size = 32
     n_samples = 16
     
     init_seqlen = 18
@@ -53,8 +53,8 @@ class Config():
         cog_size = 72
 
         
-        n_lat_embd = 256
-        n_lon_embd = 256
+        n_lat_embd = 512
+        n_lon_embd = 512
         n_sog_embd = 128
         n_cog_embd = 128
     
@@ -93,7 +93,7 @@ class Config():
     # model parameters
     #===================================================
     n_head = 8
-    n_layer = 8
+    n_layer = 9
     full_size = lat_size + lon_size + sog_size + cog_size
     n_embd = n_lat_embd + n_lon_embd + n_sog_embd + n_cog_embd
     # base GPT config, params common to all GPT versions
