@@ -28,6 +28,7 @@ D2C_MIN = 2000
 SOG_MAX = 30
 
 # File paths
+vessel_type = 'tankers_and_cargo'
 dataset_path = "/home/chucey/GQP/"
 pkl_filename = "us_continent_2024_track.pkl"
 pkl_filename_train = "us_continent_2024_train_track.pkl"
@@ -49,6 +50,38 @@ t_max = time.mktime(time.strptime("2024-02-29T23:59:59", "%Y-%m-%dT%H:%M:%S"))
 LAT, LON, SOG, COG, HEADING, TIMESTAMP, MMSI, SHIPTYPE, LENGTH, WIDTH, CARGO = list(range(11))
 CARGO_TANKER_ONLY = False
 
+def validate_and_standardize_dtypes(df, filename):
+    """
+    Validate and standardize data types across all CSV files.
+    """
+    # Expected data type ranges for validation
+    validations = {
+        'LAT': (-90, 90),
+        'LON': (-180, 180),
+        'SOG': (0, 100),     # Speed over ground in knots
+        'COG': (0, 360),     # Course over ground in degrees
+        'Heading': (0, 360), # Heading in degrees
+        'VesselType': (0, 99), # AIS vessel type codes
+        'Length': (0, 1000), # Length in meters
+        'Width': (0, 200),   # Width in meters
+        'MMSI': (100000000, 999999999)  # Valid MMSI range
+    }
+    
+    validation_results = {}
+    for col, (min_val, max_val) in validations.items():
+        if col in df.columns:
+            # Count values outside valid range
+            invalid_count = len(df[(df[col] < min_val) | (df[col] > max_val)])
+            if invalid_count > 0:
+                validation_results[col] = invalid_count
+    
+    if validation_results:
+        print(f"  Validation warnings for {filename}:")
+        for col, count in validation_results.items():
+            print(f"    {col}: {count} values outside valid range")
+    
+    return df
+
 def process_csv_file(args):
     """
     Process a single CSV file using pandas for speed.
@@ -67,27 +100,58 @@ def process_csv_file(args):
                        'VesselName', 'IMO', 'CallSign', 'VesselType', 'Status', 'Length', 
                        'Width', 'Draft', 'Cargo', 'TranscieverClass']
         
-        # Read with optimal dtypes
+        # Read with consistent dtypes across all files (handle NaN values)
         df = pd.read_csv(data_path, 
                         names=column_names,
                         skiprows=1,  # Skip header
                         dtype={
-                            'MMSI': 'int32',
-                            'LAT': 'float32', 
-                            'LON': 'float32',
-                            'SOG': 'float32',
-                            'COG': 'float32',
-                            'Heading': 'float32',
-                            'VesselType': 'int16',
-                            'Length': 'int16',
-                            'Width': 'int16',
-                            'Cargo': 'float32'
+                            'MMSI': 'float64',        # Consistent float to handle NaN
+                            'BaseDateTime': 'str',    # String for datetime parsing
+                            'LAT': 'float32',         # Consistent float32
+                            'LON': 'float32',         # Consistent float32
+                            'SOG': 'float32',         # Consistent float32
+                            'COG': 'float32',         # Consistent float32
+                            'Heading': 'float32',     # Consistent float32
+                            'VesselName': 'str',      # String for vessel names
+                            'IMO': 'str',             # String for IMO numbers
+                            'CallSign': 'str',        # String for call signs
+                            'VesselType': 'float32',  # Float to handle NaN
+                            'Status': 'str',          # String for status
+                            'Length': 'float32',      # Float to handle NaN
+                            'Width': 'float32',       # Float to handle NaN
+                            'Draft': 'float32',       # Float for draft values
+                            'Cargo': 'float32',       # Float for cargo values
+                            'TranscieverClass': 'str' # String for transceiver class
                         },
-                        parse_dates=['BaseDateTime'],
-                        date_parser=lambda x: pd.to_datetime(x, format="%Y-%m-%dT%H:%M:%S"))
+                        na_values=['', 'NULL', 'null', 'N/A', 'n/a', 'NaN', 'nan']  # Consistent NaN handling
+                        )
+        
+        # Validate column structure
+        expected_columns = len(column_names)
+        if len(df.columns) != expected_columns:
+            print(f"Warning: {csv_filename} has {len(df.columns)} columns, expected {expected_columns}")
+        
+        # Convert datetime column using modern pandas approach with error handling
+        try:
+            df['BaseDateTime'] = pd.to_datetime(df['BaseDateTime'], format="%Y-%m-%dT%H:%M:%S", errors='coerce')
+        except:
+            # Fallback for different datetime formats
+            df['BaseDateTime'] = pd.to_datetime(df['BaseDateTime'], errors='coerce')
         
         # Convert timestamp to unix timestamp
         df['Timestamp'] = df['BaseDateTime'].astype('int64') / 1e9
+        
+        # Ensure consistent numeric types before filtering
+        numeric_columns = ['MMSI', 'LAT', 'LON', 'SOG', 'COG', 'Heading', 'VesselType', 'Length', 'Width', 'Cargo']
+        for col in numeric_columns:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors='coerce')
+        
+        # Drop rows with NaN values in critical columns
+        df = df.dropna(subset=['MMSI', 'VesselType', 'Length', 'Width', 'LAT', 'LON', 'BaseDateTime'])
+        
+        # Validate and standardize data types
+        df = validate_and_standardize_dtypes(df, csv_filename)
         
         # Filter data immediately to reduce memory usage
         mask = (
@@ -95,6 +159,10 @@ def process_csv_file(args):
             (df['LON'] >= LON_MIN) & (df['LON'] <= LON_MAX) &
             (df['SOG'] >= 0) & (df['SOG'] <= SOG_MAX) &
             (df['COG'] >= 0) & (df['COG'] <= 360) &
+            (df['Length'] >= 0) & (df['Width'] >= 0) &
+            # Vessel type filtering
+            (df['VesselType'] >= (70 if vessel_type == 'tankers_and_cargo' else 30 if vessel_type == 'fishing' else 0)) & 
+            (df['VesselType'] <= (89 if vessel_type == 'tankers_and_cargo' else 30 if vessel_type == 'fishing' else 99)) &
             (df['Timestamp'] >= t_min) & (df['Timestamp'] <= t_max)
         )
         
@@ -105,20 +173,37 @@ def process_csv_file(args):
             print(f"No valid data in {csv_filename}")
             return np.array([]).reshape(0, 11)
         
-        # Create output array
-        result = np.column_stack([
-            df_filtered['LAT'].values.astype(np.float32),
-            df_filtered['LON'].values.astype(np.float32),
-            df_filtered['SOG'].values.astype(np.float32),
-            df_filtered['COG'].values.astype(np.float32),
-            df_filtered['Heading'].values.astype(np.float32),
-            df_filtered['Timestamp'].values.astype(np.float64),
-            df_filtered['MMSI'].values.astype(np.int32),
-            df_filtered['VesselType'].values.astype(np.int16),
-            df_filtered['Length'].values.astype(np.int16),
-            df_filtered['Width'].values.astype(np.int16),
-            df_filtered['Cargo'].values.astype(np.float32)
-        ])
+        # Create output array with consistent data types
+        try:
+            result = np.column_stack([
+                df_filtered['LAT'].values.astype(np.float32),
+                df_filtered['LON'].values.astype(np.float32),
+                df_filtered['SOG'].values.astype(np.float32),
+                df_filtered['COG'].values.astype(np.float32),
+                df_filtered['Heading'].values.astype(np.float32),
+                df_filtered['Timestamp'].values.astype(np.float64),
+                df_filtered['MMSI'].values.astype(np.int32),
+                df_filtered['VesselType'].values.astype(np.int16),
+                df_filtered['Length'].values.astype(np.int16),
+                df_filtered['Width'].values.astype(np.int16),
+                df_filtered['Cargo'].values.astype(np.float32)
+            ])
+        except Exception as type_error:
+            print(f"  Type conversion error in {csv_filename}: {type_error}")
+            # Try with more lenient conversion
+            result = np.column_stack([
+                pd.to_numeric(df_filtered['LAT'], errors='coerce').values.astype(np.float32),
+                pd.to_numeric(df_filtered['LON'], errors='coerce').values.astype(np.float32),
+                pd.to_numeric(df_filtered['SOG'], errors='coerce').values.astype(np.float32),
+                pd.to_numeric(df_filtered['COG'], errors='coerce').values.astype(np.float32),
+                pd.to_numeric(df_filtered['Heading'], errors='coerce').values.astype(np.float32),
+                df_filtered['Timestamp'].values.astype(np.float64),
+                pd.to_numeric(df_filtered['MMSI'], errors='coerce').values.astype(np.int32),
+                pd.to_numeric(df_filtered['VesselType'], errors='coerce').values.astype(np.int16),
+                pd.to_numeric(df_filtered['Length'], errors='coerce').values.astype(np.int16),
+                pd.to_numeric(df_filtered['Width'], errors='coerce').values.astype(np.int16),
+                pd.to_numeric(df_filtered['Cargo'], errors='coerce').values.astype(np.float32)
+            ])
         
         print(f"Processed {csv_filename}: {len(result):,} valid messages")
         return result
@@ -159,8 +244,11 @@ def split_and_save_data(m_msg):
         
         # Save to pickle
         filename = f"us_continent_2024_{split_name}_track.pkl"
-        output_path = os.path.join('data', 'US_data', filename)
-        
+        if vessel_type is not None:
+            output_path = os.path.join('data', 'US_data', vessel_type, filename)
+        else:
+            output_path = os.path.join('data', 'US_data', filename)
+
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
         with open(output_path, "wb") as f:
             pickle.dump(vessel_dict, f)
@@ -209,7 +297,7 @@ def main():
     file_args = [(csv_filename, dataset_path) for csv_filename in l_csv_filename]
     
     # Process CSV files in parallel
-    print("\\n" + "="*60)
+    print("\n" + "="*60)
     print("LOADING AND PROCESSING CSV FILES")
     print("="*60)
     
@@ -230,7 +318,7 @@ def main():
                 print(f"Error processing {filename}: {e}")
     
     # Combine all data
-    print("\\nCombining all data...")
+    print("\nCombining all data...")
     if all_data:
         m_msg = np.vstack(all_data)
     else:
@@ -241,25 +329,30 @@ def main():
     print(f"Data shape: {m_msg.shape}")
     
     # Print statistics
-    print("\\n" + "="*60)
+    print("\n" + "="*60)
     print("DATA STATISTICS")
     print("="*60)
     print(f"Latitude range: {np.min(m_msg[:,LAT]):.2f} to {np.max(m_msg[:,LAT]):.2f}")
     print(f"Longitude range: {np.min(m_msg[:,LON]):.2f} to {np.max(m_msg[:,LON]):.2f}")
     print(f"Speed range: {np.min(m_msg[:,SOG]):.2f} to {np.max(m_msg[:,SOG]):.2f}")
+    print(f"Vessel Types: {np.unique(m_msg[:, SHIPTYPE], return_counts=True)}")
     print(f"Unique vessels: {len(np.unique(m_msg[:,MMSI])):,}")
     
     # Save all messages to .npy file
-    print("\\nSaving all AIS messages to .npy file...")
-    os.makedirs(os.path.join('data', 'US_data'), exist_ok=True)
-    np.save(os.path.join('data', 'US_data', 'all_msgs.npy'), m_msg)
+    print("\nSaving all AIS messages to .npy file...")
+    if vessel_type is not None:
+        os.makedirs(os.path.join('data', 'US_data', vessel_type), exist_ok=True)
+        np.save(os.path.join('data', 'US_data', vessel_type, 'all_msgs.npy'), m_msg)
+    else:
+        os.makedirs(os.path.join('data', 'US_data'), exist_ok=True)
+        np.save(os.path.join('data', 'US_data', 'all_msgs.npy'), m_msg)
     
     # Split and save data
     split_and_save_data(m_msg)
     
     # Performance summary
     total_time = time.time() - start_time
-    print("\\n" + "="*60)
+    print("\n" + "="*60)
     print("PROCESSING COMPLETE!")
     print("="*60)
     print(f"Total processing time: {total_time/60:.1f} minutes")

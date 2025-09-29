@@ -21,14 +21,25 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 import functools
 
 # %%
-dataset_dir = os.path.join(os.getcwd(),"data","US_data")
+vessel_type = 'tankers_and_cargo'  # Set to None to process all vessel types, or specify a type like 'tankers_and_cargo', 'passenger', etc. 
+
+if vessel_type is not None:
+    print(f"Processing vessel type: {vessel_type}")
+    dataset_dir = os.path.join(os.getcwd(), "data", "US_data", vessel_type)
+else:
+    print("Processing all vessel types")
+    dataset_dir = os.path.join(os.getcwd(),"data","US_data")
 
 l_input_filepath = [
     "us_continent_2024_valid_track.pkl",
     "us_continent_2024_train_track.pkl",
     "us_continent_2024_test_track.pkl"
 ]
-l_output_filepath = os.path.join(os.getcwd(),"data","US_data","cleaned_data")
+
+if vessel_type is not None:
+    l_output_filepath = os.path.join(os.getcwd(),"data","US_data","cleaned_data", vessel_type)
+else:
+    l_output_filepath = os.path.join(os.getcwd(),"data","US_data","cleaned_data")
 
 # %%
 # These are coordinate bounds for the US dataset used in this project. These only include areas off the coast of mainland US but including Alaska.
@@ -218,7 +229,6 @@ def process_single_file(filename):
         data_list.append(data_dict)
     
     # Save results
-    l_output_filepath = os.path.join(os.getcwd(),"data","US_data","cleaned_data")
     if not os.path.exists(l_output_filepath):
         os.makedirs(l_output_filepath)
     
