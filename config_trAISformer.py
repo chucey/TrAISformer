@@ -33,7 +33,7 @@ class Config():
         device = torch.device("cpu")
     print(f"Using device: {device}")
 
-    max_epochs = 100
+    max_epochs = 50
     batch_size = 32
     n_samples = 16
     
@@ -53,8 +53,8 @@ class Config():
         cog_size = 72
 
         
-        n_lat_embd = 512
-        n_lon_embd = 512
+        n_lat_embd = 256
+        n_lon_embd = 256
         n_sog_embd = 128
         n_cog_embd = 128
     
@@ -93,7 +93,7 @@ class Config():
     # model parameters
     #===================================================
     n_head = 8
-    n_layer = 9
+    n_layer = 14
     full_size = lat_size + lon_size + sog_size + cog_size
     n_embd = n_lat_embd + n_lon_embd + n_sog_embd + n_cog_embd
     # base GPT config, params common to all GPT versions
@@ -111,7 +111,7 @@ class Config():
     lr_decay = True
     warmup_tokens = 512*20 # these two numbers come from the GPT-3 paper, but may not be good defaults elsewhere
     final_tokens = 260e9 # (at what point we reach 10% of original LR)
-    num_workers = 0 # for DataLoader
+    num_workers = 4 # for DataLoader
     
     filename = f"{dataset_name}"\
         + f"-{mode}-{sample_mode}-{top_k}-{r_vicinity}"\
