@@ -47,10 +47,10 @@ class Config():
 
         # When mode == "grad" or "pos_grad", sog and cog are actually dlat and
         # dlon
-        lat_size = 400 #250 for Danish data
-        lon_size = 1000  #270 for Danish data
-        sog_size = 30
-        cog_size = 72
+        lat_size = 800 #250 for Danish data
+        lon_size = 2000  #270 for Danish data
+        sog_size = 60 #30
+        cog_size = 108 #72
 
         
         n_lat_embd = 256
@@ -93,7 +93,7 @@ class Config():
     # model parameters
     #===================================================
     n_head = 8
-    n_layer = 14
+    n_layer = 8
     full_size = lat_size + lon_size + sog_size + cog_size
     n_embd = n_lat_embd + n_lon_embd + n_sog_embd + n_cog_embd
     # base GPT config, params common to all GPT versions
