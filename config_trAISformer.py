@@ -47,8 +47,8 @@ class Config():
 
         # When mode == "grad" or "pos_grad", sog and cog are actually dlat and
         # dlon
-        lat_size = 800 #250 for Danish data
-        lon_size = 2000  #270 for Danish data
+        lat_size = 4000 #250 for Danish data
+        lon_size = 10000  #270 for Danish data
         sog_size = 60 #30
         cog_size = 108 #72
 
