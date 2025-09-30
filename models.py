@@ -268,7 +268,7 @@ class TrAISformer(nn.Module):
             return idxs, idxs_uniform
     
     
-    def forward(self, x, masks = None, with_targets=False, return_loss_tuple=False):
+    def forward(self, x, masks = None, with_targets=False, return_loss_tuple=False, return_hidden=False):
         """
         Args:
             x: a Tensor of size (batchsize, seqlen, 4). x has been truncated 
@@ -379,8 +379,12 @@ class TrAISformer(nn.Module):
         
             loss = loss.mean()
         
-        if return_loss_tuple:
+        if return_loss_tuple and return_hidden:
+            return logits, loss, loss_tuple, fea
+        elif return_loss_tuple:
             return logits, loss, loss_tuple
+        elif return_hidden:
+            return logits, loss, fea
         else:
             return logits, loss
         
