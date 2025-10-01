@@ -29,7 +29,7 @@ SOG_MAX = 30
 
 # File paths
 vessel_type = 'tankers_and_cargo'
-dataset_path = "/home/chucey/GQP/"
+dataset_path = "/Users/alexmiekisz/Downloads/"
 pkl_filename = "us_continent_2024_track.pkl"
 pkl_filename_train = "us_continent_2024_train_track.pkl"
 pkl_filename_valid = "us_continent_2024_valid_track.pkl"

@@ -22,7 +22,7 @@ import torch
 
 
 class Config():
-    retrain = True
+    retrain = False
     tb_log = False
 
     if torch.backends.mps.is_available():
@@ -33,12 +33,12 @@ class Config():
         device = torch.device("cpu")
     print(f"Using device: {device}")
 
-    max_epochs = 50
-    batch_size = 32
+    max_epochs = 10
+    batch_size = 128
     n_samples = 16
     
-    init_seqlen = 18
-    max_seqlen = 120
+    init_seqlen = 12
+    max_seqlen = 48
     min_seqlen =  36
     
     dataset_name = "us_continent_2024" # "ct_dma", "us_continent", "us_eastcoast", "us_westcoast"
@@ -47,16 +47,16 @@ class Config():
 
         # When mode == "grad" or "pos_grad", sog and cog are actually dlat and
         # dlon
-        lat_size = 4000 #250 for Danish data
-        lon_size = 10000  #270 for Danish data
-        sog_size = 60 #30
-        cog_size = 108 #72
+        lat_size = 200 #250 for Danish data
+        lon_size = 5000  #270 for Danish data
+        sog_size = 30 #30
+        cog_size = 72 #72
 
         
-        n_lat_embd = 256
-        n_lon_embd = 256
-        n_sog_embd = 128
-        n_cog_embd = 128
+        n_lat_embd = 128
+        n_lon_embd = 128
+        n_sog_embd = 64
+        n_cog_embd = 64
     
         lat_min = 20 #55.5
         lat_max = 60    #58.0
@@ -92,8 +92,8 @@ class Config():
 
     # model parameters
     #===================================================
-    n_head = 8
-    n_layer = 8
+    n_head = 4
+    n_layer = 6
     full_size = lat_size + lon_size + sog_size + cog_size
     n_embd = n_lat_embd + n_lon_embd + n_sog_embd + n_cog_embd
     # base GPT config, params common to all GPT versions
