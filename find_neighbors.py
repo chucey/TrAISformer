@@ -197,15 +197,15 @@ if __name__ == "__main__":
         radius_km = 1.0  # default
 
     df_all = load_predictions(str(args.preds_csv_target))
+
+    # Target's PREDICTED trajectory
     df_target = df_all[df_all["mmsi"] == args.target_mmsi].copy()
     if df_target.empty:
         raise SystemExit(f"No predictions found for MMSI {args.target_mmsi} in {args.preds_csv_target}")
 
-    # Others pool
-    if args.preds_csv_others is None:
-        df_others = df_all[df_all["mmsi"] != args.target_mmsi].copy()
-    else:
-        df_others = load_predictions(str(args.preds_csv_others))
+    # Neighbors’ PREDICTED trajectories (everyone else from the SAME predictions file)
+    df_others = df_all[df_all["mmsi"] != args.target_mmsi].copy()
+
 
     # Align timestamps (exact or tolerance inside the core function)
     out = find_neighbors_for_target(
