@@ -33,7 +33,7 @@ class Config():
         device = torch.device("cpu")
     print(f"Using device: {device}")
 
-    max_epochs = 50
+    max_epochs = 70
     batch_size = 32
     n_samples = 16
     
@@ -47,10 +47,10 @@ class Config():
 
         # When mode == "grad" or "pos_grad", sog and cog are actually dlat and
         # dlon
-        lat_size = 4000 #250 for Danish data
-        lon_size = 10000  #270 for Danish data
+        lat_size = 8000 #250 for Danish data
+        lon_size = 20000  #270 for Danish data
         sog_size = 60 #30
-        cog_size = 108 #72
+        cog_size = 180 #72
 
         
         n_lat_embd = 256
@@ -121,7 +121,8 @@ class Config():
         + f"-head-{n_head}-{n_layer}"\
         + f"-bs-{batch_size}"\
         + f"-lr-{learning_rate}"\
-        + f"-seqlen-{init_seqlen}-{max_seqlen}"
+        + f"-seqlen-{init_seqlen}-{max_seqlen}"\
+        + f"-epochs-{max_epochs}"
     savedir = "./results/"+filename+"/"
     
     ckpt_path = os.path.join(savedir,"model.pt")   
