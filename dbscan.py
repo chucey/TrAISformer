@@ -4,6 +4,7 @@ import json
 import numpy as np
 import pickle
 import pandas as pd
+import multiprocessing as mp
 from sktime.clustering.dbscan import TimeSeriesDBSCAN
 from sklearn.metrics import silhouette_score
 from sklearn.metrics import adjusted_rand_score, calinski_harabasz_score, davies_bouldin_score
@@ -17,7 +18,8 @@ This DBSCAN implementation uses DTW as the distance metric, which is suitable fo
 This model was trained on an entire dataset, and will be used to generate ground truth labels, which will be used to train a neural network.
 '''
 # %%
-data_dir = '/home/chucey/GQP/TrAISformer/data/US_data/cleaned_data/tankers_and_cargo/'
+vessel_type = 'tankers_and_cargo'
+data_dir = f'/home/chucey/GQP/TrAISformer/data/US_data/cleaned_data/{vessel_type}/dbscan_data/'
 phases = ['train', 'test', 'valid']
 # phases =['test']
 
@@ -27,7 +29,7 @@ arrays_to_stack = []
 phase_lengths = []
 
 for phase in phases:
-    with open(os.path.join(data_dir, f'us_continent_2024_{phase}_track.pkl'), 'rb') as f:
+    with open(os.path.join(data_dir, f'us_continent_2024_dbscan_{phase}_track.pkl'), 'rb') as f:
         data = pickle.load(f)
     phase_lengths.append((phase, len(data)))
     
@@ -41,7 +43,7 @@ for phase in phases:
 
 # Calculate 95th percentile as target length
 target_length = int(np.percentile(all_lengths, 95))
-print(f"\nLengths: {all_lengths}")
+# print(f"\nLengths: {all_lengths}")
 print(f"95th percentile target length: {target_length}")
 
 # Process each array to have exactly the target length
@@ -70,13 +72,15 @@ for i, arr in enumerate(arrays_to_stack):
 # Stack all arrays to get shape (3, target_length, 4)
 stacked_array = np.stack(processed_arrays, axis=0)
 print(f"\nStacked array shape: {stacked_array.shape}")
-stacked_array.shape
+# stacked_array.shape
 # %%
 def cluster(X: np.ndarray, eps: float, min_samples: int, distance_metric: str = 'dtw') -> dict:
     '''
     Perform DBSCAN clustering on time series data and return clustering results and metrics.
     '''
+    print(f"Initializing TimeSeriesDBSCAN with {mp.cpu_count()} CPU cores...")
     dbscan = TimeSeriesDBSCAN(eps=eps, min_samples=min_samples, distance=distance_metric, n_jobs=-1)
+    print(f"Fitting DBSCAN model on {X.shape[0]} samples with {distance_metric.upper()} distance...")
     dbscan.fit(X)
     labels = dbscan.labels_
     n_clusters = len(set(labels)) - (1 if -1 in labels else 0)
@@ -165,10 +169,24 @@ X = stacked_array
 # X_sample = X[indices]
 # print(f"Clustering on test array of shape: {X_sample.shape}")
 
+# Display CPU information for clustering
+total_cpus = mp.cpu_count()
+print(f"\n{'='*60}")
+print(f"CLUSTERING CONFIGURATION")
+print(f"{'='*60}")
+print(f"Dataset shape: {X.shape}")
+print(f"Available CPUs: {total_cpus}")
+print(f"CPUs used for clustering: {total_cpus} (n_jobs=-1)")
+print(f"Distance metric: {distance_metric}")
+print(f"DBSCAN parameters: eps={eps}, min_samples={min_samples}")
+print(f"{'='*60}")
+print("Starting clustering...")
+
 clustering_results = cluster(X, eps=eps, min_samples=min_samples, distance_metric=distance_metric)
+print("Clustering completed!")
 evaluation = evaluate_clustering(X, clustering_results['labels'], metric_name="DTW")
 
-label_save_dir = '/home/chucey/GQP/TrAISformer/data/US_data/cleaned_data/tankers_and_cargo/labels/'
+label_save_dir = f'/home/chucey/GQP/TrAISformer/data/US_data/cleaned_data/{vessel_type}/dbscan_data/labels/'
 if not os.path.exists(label_save_dir):
     os.makedirs(label_save_dir)
 
