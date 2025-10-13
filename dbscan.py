@@ -1,5 +1,6 @@
 #%%
 import os
+import sys
 import json
 import numpy as np
 import pickle
@@ -23,28 +24,74 @@ data_dir = f'/home/chucey/GQP/TrAISformer/data/US_data/cleaned_data/{vessel_type
 phases = ['train', 'test', 'valid']
 # phases =['test']
 
+print("="*60)
+print("DBSCAN CLUSTERING SCRIPT STARTED")
+print("="*60)
+print(f"Vessel type: {vessel_type}")
+print(f"Data directory: {data_dir}")
+print(f"Phases to process: {phases}")
+
+# Check if data directory exists
+if not os.path.exists(data_dir):
+    print(f"ERROR: Data directory does not exist: {data_dir}")
+    print("Please check the path and ensure data files are available.")
+    exit(1)
+
+print(f"Data directory exists: {data_dir}")
+
 # First pass: collect all lengths to calculate 95th percentile
 all_lengths = []
 arrays_to_stack = []
 phase_lengths = []
 
+print("\nLoading data files...")
 for phase in phases:
-    with open(os.path.join(data_dir, f'us_continent_2024_dbscan_{phase}_track.pkl'), 'rb') as f:
-        data = pickle.load(f)
-    phase_lengths.append((phase, len(data)))
+    file_path = os.path.join(data_dir, f'us_continent_2024_dbscan_{phase}_track.pkl')
+    print(f"  Loading {phase} data from: {file_path}")
+    
+    if not os.path.exists(file_path):
+        print(f"  ERROR: File does not exist: {file_path}")
+        continue
+        
+    try:
+        with open(file_path, 'rb') as f:
+            data = pickle.load(f)
+        print(f"  Successfully loaded {phase} data: {len(data)} samples")
+        phase_lengths.append((phase, len(data)))
+    except Exception as e:
+        print(f"  ERROR loading {phase} data: {str(e)}")
+        continue
     
     # Get the trajectories from each phase and take first 4 features
     for idx in range(len(data)):
+        try:
+            phase_array = data[idx]['traj'][:, :4]
+            arrays_to_stack.append(phase_array)
+            all_lengths.append(phase_array.shape[0])
+            # print(f"{phase} original shape: {phase_array.shape}")
+        except Exception as e:
+            print(f"    ERROR processing trajectory {idx} in {phase}: {str(e)}")
+            continue
 
-        phase_array = data[idx]['traj'][:, :4]
-        arrays_to_stack.append(phase_array)
-        all_lengths.append(phase_array.shape[0])
-        # print(f"{phase} original shape: {phase_array.shape}")
+# Check if we have any data loaded
+if not all_lengths:
+    print("ERROR: No trajectory data was successfully loaded!")
+    print("Please check:")
+    print("1. Data directory exists and contains the expected .pkl files")
+    print("2. Files are not corrupted")
+    print("3. Files contain the expected data structure")
+    exit(1)
 
 # Calculate 95th percentile as target length
 target_length = int(np.percentile(all_lengths, 95))
-# print(f"\nLengths: {all_lengths}")
-print(f"95th percentile target length: {target_length}")
+print(f"\nData loading summary:")
+print(f"  Total trajectories loaded: {len(all_lengths)}")
+print(f"  Length range: {min(all_lengths)} - {max(all_lengths)}")
+print(f"  95th percentile target length: {target_length}")
+
+# Flush output to ensure it appears in SLURM logs
+print("Flushing output...")
+sys.stdout.flush()
 
 # Process each array to have exactly the target length
 processed_arrays = []
@@ -69,10 +116,19 @@ for i, arr in enumerate(arrays_to_stack):
     processed_arrays.append(processed)
     # print(f"{phases[i]} final shape: {processed.shape}")
 
-# Stack all arrays to get shape (3, target_length, 4)
+# Check if we have processed arrays
+if not processed_arrays:
+    print("ERROR: No arrays were processed successfully!")
+    exit(1)
+
+# Stack all arrays to get shape (n_trajectories, target_length, 4)
 stacked_array = np.stack(processed_arrays, axis=0)
-print(f"\nStacked array shape: {stacked_array.shape}")
-# stacked_array.shape
+print(f"\nData preprocessing completed:")
+print(f"  Stacked array shape: {stacked_array.shape}")
+print(f"  Ready for clustering with {stacked_array.shape[0]} trajectories")
+
+# Flush output
+sys.stdout.flush()
 # %%
 def cluster(X: np.ndarray, eps: float, min_samples: int, distance_metric: str = 'dtw') -> dict:
     '''
@@ -172,7 +228,7 @@ X = stacked_array
 # Display CPU information for clustering
 total_cpus = mp.cpu_count()
 print(f"\n{'='*60}")
-print(f"CLUSTERING CONFIGURATION")
+print(f"\n5. STARTING DBSCAN CLUSTERING")
 print(f"{'='*60}")
 print(f"Dataset shape: {X.shape}")
 print(f"Available CPUs: {total_cpus}")
@@ -180,22 +236,57 @@ print(f"CPUs used for clustering: {total_cpus} (n_jobs=-1)")
 print(f"Distance metric: {distance_metric}")
 print(f"DBSCAN parameters: eps={eps}, min_samples={min_samples}")
 print(f"{'='*60}")
-print("Starting clustering...")
+print("Initializing clustering...")
+sys.stdout.flush()
 
-clustering_results = cluster(X, eps=eps, min_samples=min_samples, distance_metric=distance_metric)
-print("Clustering completed!")
-evaluation = evaluate_clustering(X, clustering_results['labels'], metric_name="DTW")
+try:
+    clustering_results = cluster(X, eps=eps, min_samples=min_samples, distance_metric=distance_metric)
+    print("Clustering completed successfully!")
+    sys.stdout.flush()
+    
+    print("Computing evaluation metrics...")
+    sys.stdout.flush()
+    evaluation = evaluate_clustering(X, clustering_results['labels'], metric_name="DTW")
+    print("Evaluation completed!")
+    sys.stdout.flush()
+    
+except Exception as e:
+    print(f"ERROR during clustering or evaluation: {e}")
+    import traceback
+    traceback.print_exc()
+    sys.stdout.flush()
+    exit(1)
 
+# Prepare save directory
 label_save_dir = f'/home/chucey/GQP/TrAISformer/data/US_data/cleaned_data/{vessel_type}/dbscan_data/labels/'
-if not os.path.exists(label_save_dir):
-    os.makedirs(label_save_dir)
+try:
+    if not os.path.exists(label_save_dir):
+        os.makedirs(label_save_dir)
+        print(f"Created directory: {label_save_dir}")
+    else:
+        print(f"Using existing directory: {label_save_dir}")
+except Exception as e:
+    print(f"ERROR creating directory {label_save_dir}: {e}")
+    exit(1)
 
+print(f"\n6. CLUSTERING RESULTS SUMMARY")
+print(f"{'='*60}")
 print(f"Clustering results: {clustering_results}")
 print(f"Evaluation metrics: {evaluation}")
+print(f"{'='*60}")
+sys.stdout.flush()
+
+print("Saving clustering results...")
 # Save clustering labels
-with open(os.path.join(label_save_dir, f'us_continent_2024_dbscan_labels_eps{eps}_min{min_samples}.pkl'), 'wb') as f:
-    pickle.dump(clustering_results['labels'], f)
-print(f"Clustering labels saved to {label_save_dir}")
+try:
+    labels_filename = f'us_continent_2024_dbscan_labels_eps{eps}_min{min_samples}.pkl'
+    labels_filepath = os.path.join(label_save_dir, labels_filename)
+    with open(labels_filepath, 'wb') as f:
+        pickle.dump(clustering_results['labels'], f)
+    print(f"Clustering labels saved to: {labels_filepath}")
+except Exception as e:
+    print(f"ERROR saving clustering labels: {e}")
+    exit(1)
 # save clustering and evaluation results to json (excluding numpy arrays)
 # Create a clean results dictionary with only scalar values and metadata
 json_results = {
@@ -219,11 +310,25 @@ json_results = {
 }
 
 # Save to JSON file (without numpy arrays)
-json_filename = f'us_continent_2024_dbscan_results_eps{eps}_min{min_samples}.json'
-with open(os.path.join(label_save_dir, json_filename), 'w') as f:
-    json.dump(json_results, f, indent=4)
+try:
+    json_filename = f'us_continent_2024_dbscan_results_eps{eps}_min{min_samples}.json'
+    json_filepath = os.path.join(label_save_dir, json_filename)
+    with open(json_filepath, 'w') as f:
+        json.dump(json_results, f, indent=4)
+    
+    print(f"Clustering metadata saved to JSON: {json_filepath}")
+    print("Note: Full labels array is saved separately as .pkl file for efficient loading")
+except Exception as e:
+    print(f"ERROR saving JSON results: {e}")
+    # Don't exit here since labels are already saved
 
-print(f"Clustering results (metadata only) saved to JSON: {json_filename}")
-print("Note: Full labels array is saved separately as .pkl file for efficient loading")
+print(f"\n{'='*60}")
+print("DBSCAN CLUSTERING COMPLETED SUCCESSFULLY!")
+print(f"Total trajectories processed: {X.shape[0]}")
+print(f"Clusters found: {clustering_results['n_clusters']}")
+print(f"Noise points: {clustering_results['n_noise']}")
+print(f"Results saved in: {label_save_dir}")
+print(f"{'='*60}")
+sys.stdout.flush()
 
 # %%
