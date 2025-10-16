@@ -210,11 +210,11 @@ def evaluate_clustering(X, labels, metric_name=""):
         'n_samples': n_samples,
         'Calinski-Harabasz': ch_score if n_clusters > 1 and n_noise < n_samples else None,
         'Davies-Bouldin': db_score if n_clusters > 1 and n_noise < n_samples else None,
-        'size_ratio': size_ratio
+        'size_ratio': size_ratio if n_clusters > 1 and n_noise < n_samples else None
     }
 # %%
 # perform clustering with tuned hyperparameters
-eps = 21.5
+eps = 18.5
 min_samples = 25
 distance_metric = 'dtw'
 
