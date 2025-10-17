@@ -214,7 +214,7 @@ def evaluate_clustering(X, labels, metric_name=""):
     }
 # %%
 # perform clustering with tuned hyperparameters
-eps = 18.5
+eps = 15
 min_samples = 25
 distance_metric = 'dtw'
 
