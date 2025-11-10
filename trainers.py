@@ -320,7 +320,9 @@ class Trainer:
 
         # Final state
         raw_model = self.model.module if hasattr(self.model, "module") else self.model
+        # optimizer = raw_model.configure_optimizers(config)
         #         logging.info("saving %s", self.config.ckpt_path)
         logging.info(f"Last epoch: {epoch:03d}, saving model to {self.config.ckpt_path}")
         save_path = self.config.ckpt_path.replace("model.pt", f"model_{epoch + 1:03d}.pt")
-        torch.save(raw_model.state_dict(), save_path)
+        torch.save(raw_model.state_dict(),
+                    save_path)

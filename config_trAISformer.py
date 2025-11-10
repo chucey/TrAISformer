@@ -22,7 +22,7 @@ import torch
 
 
 class Config():
-    retrain = True
+    retrain = False
     tb_log = False
 
     if torch.backends.mps.is_available():
@@ -33,14 +33,14 @@ class Config():
         device = torch.device("cpu")
     print(f"Using device: {device}")
 
-    max_epochs = 70
+    max_epochs = 50
     batch_size = 32
     n_samples = 16
     
-    init_seqlen = 18
-    max_seqlen = 120
-    min_seqlen =  36
-    
+    init_seqlen = 36
+    max_seqlen = 96
+    min_seqlen = 36
+
     dataset_name = "us_continent_2024" # "ct_dma", "us_continent", "us_eastcoast", "us_westcoast"
 
     if dataset_name == "us_continent_2024": #==============================
@@ -50,7 +50,7 @@ class Config():
         lat_size = 8000 #250 for Danish data
         lon_size = 20000  #270 for Danish data
         sog_size = 60 #30
-        cog_size = 180 #72
+        cog_size = 360 #72
 
         
         n_lat_embd = 256
@@ -84,7 +84,7 @@ class Config():
     
     # Data flags
     #===================================================
-    datadir = os.path.join(os.getcwd(), "data", "US_data", "cleaned_data")
+    datadir = os.path.join(os.getcwd(), "data", "US_data", "cleaned_data", "traisformer_training_data")
     trainset_name = os.path.join(datadir, f"{dataset_name}_train_track.pkl")
     validset_name = os.path.join(datadir, f"{dataset_name}_valid_track.pkl")
     testset_name = os.path.join(datadir, f"{dataset_name}_test_track.pkl")
@@ -103,7 +103,7 @@ class Config():
     
     # optimization parameters
     #===================================================
-    learning_rate = 6e-4 # 6e-4
+    learning_rate = 6e-4 # default6e-4
     betas = (0.9, 0.95)
     grad_norm_clip = 1.0
     weight_decay = 0.1 # only applied on matmul weights

@@ -214,8 +214,8 @@ def evaluate_clustering(X, labels, metric_name=""):
     }
 # %%
 # perform clustering with tuned hyperparameters
-eps = 15
-min_samples = 25
+eps = 18.0
+min_samples = 580 
 distance_metric = 'dtw'
 
 X = stacked_array
