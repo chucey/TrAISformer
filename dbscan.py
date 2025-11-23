@@ -5,6 +5,7 @@ import json
 import numpy as np
 import pickle
 import pandas as pd
+from pathlib import Path
 import multiprocessing as mp
 from sktime.clustering.dbscan import TimeSeriesDBSCAN
 from sklearn.metrics import silhouette_score
@@ -43,6 +44,7 @@ print(f"Data directory exists: {data_dir}")
 all_lengths = []
 arrays_to_stack = []
 phase_lengths = []
+sample_metadata = []
 
 print("\nLoading data files...")
 for phase in phases:
@@ -65,9 +67,16 @@ for phase in phases:
     # Get the trajectories from each phase and take first 4 features
     for idx in range(len(data)):
         try:
-            phase_array = data[idx]['traj'][:, :4]
+            record = data[idx]
+            phase_array = record['traj'][:, :4]
             arrays_to_stack.append(phase_array)
             all_lengths.append(phase_array.shape[0])
+            sample_metadata.append({
+                'phase': phase,
+                'phase_index': idx,
+                'mmsi': int(record.get('mmsi')) if record.get('mmsi') is not None else None,
+                'original_length': phase_array.shape[0]
+            })
             # print(f"{phase} original shape: {phase_array.shape}")
         except Exception as e:
             print(f"    ERROR processing trajectory {idx} in {phase}: {str(e)}")
@@ -114,6 +123,8 @@ for i, arr in enumerate(arrays_to_stack):
         # print(f"{phases[i]} already {target_length} length")
     
     processed_arrays.append(processed)
+    if i < len(sample_metadata):
+        sample_metadata[i]['processed_length'] = processed.shape[0]
     # print(f"{phases[i]} final shape: {processed.shape}")
 
 # Check if we have processed arrays
@@ -126,6 +137,10 @@ stacked_array = np.stack(processed_arrays, axis=0)
 print(f"\nData preprocessing completed:")
 print(f"  Stacked array shape: {stacked_array.shape}")
 print(f"  Ready for clustering with {stacked_array.shape[0]} trajectories")
+
+sample_metadata_df = pd.DataFrame(sample_metadata)
+sample_metadata_df['sample_idx'] = np.arange(len(sample_metadata_df))
+print(f"  Sample metadata records: {len(sample_metadata_df)}")
 
 # Flush output
 sys.stdout.flush()
@@ -218,6 +233,8 @@ eps = 18.0
 min_samples = 580 
 distance_metric = 'dtw'
 
+neighbor_csv_path = Path('neighbors_out/neighbor_list.csv')
+
 X = stacked_array
 # np.random.seed(42)
 # sample_size = min(500, X.shape[0])  # Use max 500 samples for speed
@@ -269,7 +286,55 @@ except Exception as e:
     print(f"ERROR creating directory {label_save_dir}: {e}")
     exit(1)
 
-print(f"\n6. CLUSTERING RESULTS SUMMARY")
+print(f"\n6. INCORPORATING NEIGHBOR CONTEXT")
+print(f"{'='*60}")
+neighbor_df = None
+neighbor_summary = None
+if neighbor_csv_path.exists():
+    try:
+        neighbor_df = pd.read_csv(neighbor_csv_path)
+        if 'n_neighbors' not in neighbor_df.columns:
+            neighbor_df['n_neighbors'] = 0
+        neighbor_df['n_neighbors'] = neighbor_df['n_neighbors'].fillna(0).astype(float)
+        neighbor_summary = (neighbor_df.groupby('target_mmsi')
+                            .agg(neighbor_rows=('t_unix', 'count'),
+                                 neighbor_unique_timestamps=('t_unix', 'nunique'),
+                                 avg_neighbors=('n_neighbors', 'mean'),
+                                 lonely_ratio=('n_neighbors', lambda s: np.mean(s == 0)),
+                                 min_neighbors=('n_neighbors', 'min'),
+                                 max_neighbors=('n_neighbors', 'max'))
+                            .reset_index())
+        print(f"Loaded neighbor context from {neighbor_csv_path} for {len(neighbor_summary)} MMSIs")
+    except Exception as exc:
+        print(f"WARNING: Failed to read neighbor CSV ({exc}). Continuing without neighbor context.")
+else:
+    print(f"Neighbor CSV not found at {neighbor_csv_path}. Continuing without neighbor context.")
+
+assignments_df = sample_metadata_df.iloc[:clustering_results['n_samples']].copy()
+assignments_df['dbscan_label'] = clustering_results['labels']
+assignments_df['dbscan_anomaly'] = assignments_df['dbscan_label'] == -1
+
+if neighbor_summary is not None:
+    assignments_df = assignments_df.merge(neighbor_summary,
+                                          left_on='mmsi',
+                                          right_on='target_mmsi',
+                                          how='left')
+    coverage = assignments_df['avg_neighbors'].notna().mean() * 100
+    print(f"Neighbor stats available for {coverage:.1f}% of clustered trajectories")
+    print("Sample neighbor context (first 5 rows):")
+    print(assignments_df[['mmsi', 'dbscan_label', 'avg_neighbors', 'neighbor_rows', 'neighbor_unique_timestamps']].head())
+else:
+    assignments_df['target_mmsi'] = np.nan
+    assignments_df['neighbor_rows'] = np.nan
+    assignments_df['neighbor_unique_timestamps'] = np.nan
+    assignments_df['avg_neighbors'] = np.nan
+    assignments_df['lonely_ratio'] = np.nan
+    assignments_df['min_neighbors'] = np.nan
+    assignments_df['max_neighbors'] = np.nan
+
+print("Neighbor counts merged with clustering assignments for downstream analysis.")
+
+print(f"\n7. CLUSTERING RESULTS SUMMARY")
 print(f"{'='*60}")
 print(f"Clustering results: {clustering_results}")
 print(f"Evaluation metrics: {evaluation}")
@@ -284,6 +349,9 @@ try:
     with open(labels_filepath, 'wb') as f:
         pickle.dump(clustering_results['labels'], f)
     print(f"Clustering labels saved to: {labels_filepath}")
+    neighbor_csv = os.path.join(label_save_dir, f'neighbor_context_eps{eps}_min{min_samples}.csv')
+    assignments_df.to_csv(neighbor_csv, index=False)
+    print(f"Neighbor context table saved to: {neighbor_csv}")
 except Exception as e:
     print(f"ERROR saving clustering labels: {e}")
     exit(1)
