@@ -63,6 +63,9 @@ class Config():
         lon_min = -160  #10.3
         lon_max = -60 #13
 
+        sog_max = 30  # in m/s
+        cog_max = 360 # in degree
+
     
     #===========================================================================
     # Model and sampling flags

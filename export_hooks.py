@@ -13,7 +13,7 @@ class PredictionWriter:
         if split not in self._writers:
             f = open(p, "w", newline="")
             w = csv.writer(f)
-            w.writerow(["mmsi", "t_unix", "lat_deg", "lon_deg"])
+            w.writerow(["mmsi", "t_unix", "lat_deg", "lon_deg", "sog_knots", "cog_deg"])
             self._writers[split] = (f, w)
         return self._writers[split][1]
 
@@ -37,4 +37,6 @@ class PredictionWriter:
                 t_unix = int(t_unix_batch[i][t])
                 lat = float(latlon_batch[i][t][0])
                 lon = float(latlon_batch[i][t][1])
-                w.writerow([mmsi, t_unix, lat, lon])
+                sog = float(latlon_batch[i][t][2])
+                cog = float(latlon_batch[i][t][3])
+                w.writerow([mmsi, t_unix, lat, lon, sog, cog])

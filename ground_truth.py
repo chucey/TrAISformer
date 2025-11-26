@@ -15,7 +15,7 @@ def main():
     cf = Config()
 
     init_seqlen = cf.init_seqlen
-    time_horizon = 4 #in hours
+    time_horizon = 5 #in hours
     time_steps = time_horizon * 6  # 10-min intervals
     max_sequlen = init_seqlen + time_steps
 

@@ -119,7 +119,7 @@ def find_neighbors_for_target(
 
         for row_i, (inds, dists) in enumerate(zip(inds_list, dists_list)):
             r = df_tgt_t.iloc[row_i]
-            if len(inds) == 0:
+            if len(inds) == 0: 
                 out_rows.append({
                     "target_mmsi": int(r.mmsi),
                     # "target_shiptype": int(r.SHIPTYPE), 

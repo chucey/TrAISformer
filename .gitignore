@@ -9,6 +9,7 @@ runs/
 *.log
 *.ipynb
 !dbscan.ipynb
+!product_demo.ipynb
 .DS_Store
 *.out
 *.err
