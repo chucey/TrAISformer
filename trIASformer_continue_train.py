@@ -118,14 +118,28 @@ if __name__ == "__main__":
     trainer = trainers.Trainer(
         model, aisdatasets["train"], aisdatasets["valid"], cf, savedir=cf.savedir, device=cf.device, aisdls=aisdls, INIT_SEQLEN=init_seqlen)
 
+    ## continue training from checkpoint
+    checkpoint = '/home/chucey/GQP/TrAISformer/results/us_continent_2024-pos-pos_vicinity-10-40-blur-True-False-2-1.0-data_size-8000-20000-60-360-embd_size-256-256-128-128-head-8-8-bs-32-lr-0.0006-seqlen-36-96-epochs-50/model.pt'
+    model.load_state_dict(torch.load(checkpoint, map_location=cf.device))
+
+
+    print(f"Loaded model from checkpoint: {checkpoint}")
+
+
+    # utils.new_log(cf.savedir, "log")
+
+
     ## Training
     # ===============================
     if cf.retrain:
+        print("Continue training...")
         trainer.train()
+        print("training done.")
 
     ## Evaluation
     # ===============================
     # Load the best model
+    model = models.TrAISformer(cf, partition_model=None)
     model.load_state_dict(torch.load(cf.ckpt_path))
 
     v_ranges = torch.tensor([(model.lat_max - model.lat_min), (model.lon_max - model.lon_min), 0, 0]).to(cf.device)

@@ -14,10 +14,31 @@ from multiprocessing import Pool
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import gc
 
-# Configuration
-NUM_PROCESSES = min(mp.cpu_count(), 8)  # Use up to 8 processes
-CHUNK_SIZE = 10000  # Process files in chunks
-print(f"Using {NUM_PROCESSES} processes for parallel processing")
+def get_memory_usage():
+    """Get current memory usage in MB"""
+    try:
+        import psutil
+        process = psutil.Process(os.getpid())
+        return process.memory_info().rss / 1024 / 1024
+    except ImportError:
+        return None
+
+def print_memory_status(stage):
+    """Print current memory usage"""
+    memory_mb = get_memory_usage()
+    if memory_mb:
+        print(f"[{stage}] Memory usage: {memory_mb:.1f} MB")
+    else:
+        print(f"[{stage}] Memory monitoring unavailable (install psutil for monitoring)")
+
+# Configuration - Reduced for memory efficiency
+USE_SEQUENTIAL_PROCESSING = False  # Set to True if memory issues persist
+NUM_PROCESSES = min(mp.cpu_count(), 8) if not USE_SEQUENTIAL_PROCESSING else 1
+CHUNK_SIZE = 10000  # Smaller chunks to reduce memory usage
+BATCH_SIZE = 10 if not USE_SEQUENTIAL_PROCESSING else 1  # Process files in smaller batches
+print(f"Using {'sequential' if USE_SEQUENTIAL_PROCESSING else 'parallel'} processing")
+print(f"Using {NUM_PROCESSES} processes")
+print(f"Processing files in batches of {BATCH_SIZE} to manage memory")
 
 # Parameters (same as original)
 LAT_MIN = 20
@@ -28,12 +49,20 @@ D2C_MIN = 2000
 SOG_MAX = 30
 
 # File paths
+vessel_type = 'fishing'    # choices: fishing, all, 'tankers_and_cargo'
 dataset_path = "/home/chucey/GQP/"
 pkl_filename = "us_continent_2024_track.pkl"
 pkl_filename_train = "us_continent_2024_train_track.pkl"
 pkl_filename_valid = "us_continent_2024_valid_track.pkl"
 pkl_filename_test = "us_continent_2024_test_track.pkl"
 cargo_tanker_filename = "us_continent_2024_cargo_tanker.npy"
+
+vessel_type_dict = {
+    'tankers_and_cargo': (70, 89),
+    'fishing': (30, 30),
+    'all': (0, 99)
+}
+
 
 # Time periods
 t_train_min = time.mktime(time.strptime("2024-01-01T00:00:00", "%Y-%m-%dT%H:%M:%S"))
@@ -48,6 +77,38 @@ t_max = time.mktime(time.strptime("2024-02-29T23:59:59", "%Y-%m-%dT%H:%M:%S"))
 # Column indices
 LAT, LON, SOG, COG, HEADING, TIMESTAMP, MMSI, SHIPTYPE, LENGTH, WIDTH, CARGO = list(range(11))
 CARGO_TANKER_ONLY = False
+
+def validate_and_standardize_dtypes(df, filename):
+    """
+    Validate and standardize data types across all CSV files.
+    """
+    # Expected data type ranges for validation
+    validations = {
+        'LAT': (-90, 90),
+        'LON': (-180, 180),
+        'SOG': (0, 100),     # Speed over ground in knots
+        'COG': (0, 360),     # Course over ground in degrees
+        'Heading': (0, 360), # Heading in degrees
+        'VesselType': (0, 99), # AIS vessel type codes
+        'Length': (0, 1000), # Length in meters
+        'Width': (0, 200),   # Width in meters
+        'MMSI': (100000000, 999999999)  # Valid MMSI range
+    }
+    
+    validation_results = {}
+    for col, (min_val, max_val) in validations.items():
+        if col in df.columns:
+            # Count values outside valid range
+            invalid_count = len(df[(df[col] < min_val) | (df[col] > max_val)])
+            if invalid_count > 0:
+                validation_results[col] = invalid_count
+    
+    if validation_results:
+        print(f"  Validation warnings for {filename}:")
+        for col, count in validation_results.items():
+            print(f"    {col}: {count} values outside valid range")
+    
+    return df
 
 def process_csv_file(args):
     """
@@ -67,27 +128,58 @@ def process_csv_file(args):
                        'VesselName', 'IMO', 'CallSign', 'VesselType', 'Status', 'Length', 
                        'Width', 'Draft', 'Cargo', 'TranscieverClass']
         
-        # Read with optimal dtypes
+        # Read with consistent dtypes across all files (handle NaN values)
         df = pd.read_csv(data_path, 
                         names=column_names,
                         skiprows=1,  # Skip header
                         dtype={
-                            'MMSI': 'int32',
-                            'LAT': 'float32', 
-                            'LON': 'float32',
-                            'SOG': 'float32',
-                            'COG': 'float32',
-                            'Heading': 'float32',
-                            'VesselType': 'int16',
-                            'Length': 'int16',
-                            'Width': 'int16',
-                            'Cargo': 'float32'
+                            'MMSI': 'float64',        # Consistent float to handle NaN
+                            'BaseDateTime': 'str',    # String for datetime parsing
+                            'LAT': 'float32',         # Consistent float32
+                            'LON': 'float32',         # Consistent float32
+                            'SOG': 'float32',         # Consistent float32
+                            'COG': 'float32',         # Consistent float32
+                            'Heading': 'float32',     # Consistent float32
+                            'VesselName': 'str',      # String for vessel names
+                            'IMO': 'str',             # String for IMO numbers
+                            'CallSign': 'str',        # String for call signs
+                            'VesselType': 'float32',  # Float to handle NaN
+                            'Status': 'str',          # String for status
+                            'Length': 'float32',      # Float to handle NaN
+                            'Width': 'float32',       # Float to handle NaN
+                            'Draft': 'float32',       # Float for draft values
+                            'Cargo': 'float32',       # Float for cargo values
+                            'TranscieverClass': 'str' # String for transceiver class
                         },
-                        parse_dates=['BaseDateTime'],
-                        date_parser=lambda x: pd.to_datetime(x, format="%Y-%m-%dT%H:%M:%S"))
+                        na_values=['', 'NULL', 'null', 'N/A', 'n/a', 'NaN', 'nan']  # Consistent NaN handling
+                        )
+        
+        # Validate column structure
+        expected_columns = len(column_names)
+        if len(df.columns) != expected_columns:
+            print(f"Warning: {csv_filename} has {len(df.columns)} columns, expected {expected_columns}")
+        
+        # Convert datetime column using modern pandas approach with error handling
+        try:
+            df['BaseDateTime'] = pd.to_datetime(df['BaseDateTime'], format="%Y-%m-%dT%H:%M:%S", errors='coerce')
+        except:
+            # Fallback for different datetime formats
+            df['BaseDateTime'] = pd.to_datetime(df['BaseDateTime'], errors='coerce')
         
         # Convert timestamp to unix timestamp
         df['Timestamp'] = df['BaseDateTime'].astype('int64') / 1e9
+        
+        # Ensure consistent numeric types before filtering
+        numeric_columns = ['MMSI', 'LAT', 'LON', 'SOG', 'COG', 'Heading', 'VesselType', 'Length', 'Width', 'Cargo']
+        for col in numeric_columns:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors='coerce')
+        
+        # Drop rows with NaN values in critical columns
+        df = df.dropna(subset=['MMSI', 'VesselType', 'Length', 'Width', 'LAT', 'LON', 'BaseDateTime'])
+        
+        # Validate and standardize data types
+        df = validate_and_standardize_dtypes(df, csv_filename)
         
         # Filter data immediately to reduce memory usage
         mask = (
@@ -95,6 +187,10 @@ def process_csv_file(args):
             (df['LON'] >= LON_MIN) & (df['LON'] <= LON_MAX) &
             (df['SOG'] >= 0) & (df['SOG'] <= SOG_MAX) &
             (df['COG'] >= 0) & (df['COG'] <= 360) &
+            (df['Length'] >= 0) & (df['Width'] >= 0) &
+            # Vessel type filtering
+            (df['VesselType'] >= vessel_type_dict[vessel_type][0]) &
+            (df['VesselType'] <= vessel_type_dict[vessel_type][1]) &
             (df['Timestamp'] >= t_min) & (df['Timestamp'] <= t_max)
         )
         
@@ -105,20 +201,41 @@ def process_csv_file(args):
             print(f"No valid data in {csv_filename}")
             return np.array([]).reshape(0, 11)
         
-        # Create output array
-        result = np.column_stack([
-            df_filtered['LAT'].values.astype(np.float32),
-            df_filtered['LON'].values.astype(np.float32),
-            df_filtered['SOG'].values.astype(np.float32),
-            df_filtered['COG'].values.astype(np.float32),
-            df_filtered['Heading'].values.astype(np.float32),
-            df_filtered['Timestamp'].values.astype(np.float64),
-            df_filtered['MMSI'].values.astype(np.int32),
-            df_filtered['VesselType'].values.astype(np.int16),
-            df_filtered['Length'].values.astype(np.int16),
-            df_filtered['Width'].values.astype(np.int16),
-            df_filtered['Cargo'].values.astype(np.float32)
-        ])
+        # Create output array with consistent data types and immediate memory cleanup
+        try:
+            result = np.column_stack([
+                df_filtered['LAT'].values.astype(np.float32),
+                df_filtered['LON'].values.astype(np.float32),
+                df_filtered['SOG'].values.astype(np.float32),
+                df_filtered['COG'].values.astype(np.float32),
+                df_filtered['Heading'].values.astype(np.float32),
+                df_filtered['Timestamp'].values.astype(np.float64),
+                df_filtered['MMSI'].values.astype(np.int32),
+                df_filtered['VesselType'].values.astype(np.int16),
+                df_filtered['Length'].values.astype(np.int16),
+                df_filtered['Width'].values.astype(np.int16),
+                df_filtered['Cargo'].values.astype(np.float32)
+            ])
+        except Exception as type_error:
+            print(f"  Type conversion error in {csv_filename}: {type_error}")
+            # Try with more lenient conversion
+            result = np.column_stack([
+                pd.to_numeric(df_filtered['LAT'], errors='coerce').values.astype(np.float32),
+                pd.to_numeric(df_filtered['LON'], errors='coerce').values.astype(np.float32),
+                pd.to_numeric(df_filtered['SOG'], errors='coerce').values.astype(np.float32),
+                pd.to_numeric(df_filtered['COG'], errors='coerce').values.astype(np.float32),
+                pd.to_numeric(df_filtered['Heading'], errors='coerce').values.astype(np.float32),
+                df_filtered['Timestamp'].values.astype(np.float64),
+                pd.to_numeric(df_filtered['MMSI'], errors='coerce').values.astype(np.int32),
+                pd.to_numeric(df_filtered['VesselType'], errors='coerce').values.astype(np.int16),
+                pd.to_numeric(df_filtered['Length'], errors='coerce').values.astype(np.int16),
+                pd.to_numeric(df_filtered['Width'], errors='coerce').values.astype(np.int16),
+                pd.to_numeric(df_filtered['Cargo'], errors='coerce').values.astype(np.float32)
+            ])
+        
+        # Immediate cleanup of intermediate dataframes
+        del df_filtered
+        gc.collect()
         
         print(f"Processed {csv_filename}: {len(result):,} valid messages")
         return result
@@ -154,25 +271,37 @@ def split_and_save_data(m_msg):
     ]
     
     for data, split_name in datasets:
-        print(f"Processing {split_name} set...")
+        print(f"Processing {split_name} set ({len(data):,} messages)...")
+        print_memory_status(f"Before {split_name} processing")
+        
         vessel_dict = create_vessel_dict_parallel(data)
         
         # Save to pickle
         filename = f"us_continent_2024_{split_name}_track.pkl"
-        output_path = os.path.join('data', 'US_data', filename)
-        
+        if vessel_type is not None:
+            output_path = os.path.join('data', 'US_data', vessel_type, filename)
+        else:
+            output_path = os.path.join('data', 'US_data', filename)
+
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
         with open(output_path, "wb") as f:
             pickle.dump(vessel_dict, f)
         
         print(f"Saved {split_name} set: {len(vessel_dict)} vessels to {filename}")
+        
+        # Clear memory after each dataset
+        del vessel_dict, data
+        gc.collect()
+        print_memory_status(f"After {split_name} processing")
 
 def create_vessel_dict_parallel(messages):
     """
-    Create vessel dictionary from messages using parallel processing.
+    Create vessel dictionary from messages using memory-efficient processing.
     """
     if len(messages) == 0:
         return {}
+    
+    print(f"Creating vessel tracks from {len(messages):,} messages...")
     
     # Group by MMSI using pandas for speed
     df = pd.DataFrame(messages, columns=['LAT', 'LON', 'SOG', 'COG', 'HEADING', 
@@ -180,10 +309,21 @@ def create_vessel_dict_parallel(messages):
                                        'WIDTH', 'CARGO'])
     
     vessel_dict = {}
+    processed_count = 0
+    
     for mmsi, group in tqdm(df.groupby('MMSI'), desc="Creating vessel tracks"):
         # Sort by timestamp
         track = group.sort_values('TIMESTAMP').values
         vessel_dict[int(mmsi)] = track.astype(np.float32)
+        
+        processed_count += 1
+        # Force garbage collection every 1000 vessels
+        if processed_count % 1000 == 0:
+            gc.collect()
+    
+    # Final cleanup
+    del df
+    gc.collect()
     
     return vessel_dict
 
@@ -191,6 +331,7 @@ def main():
     """Main processing function with optimizations."""
     
     start_time = time.time()
+    print_memory_status("Starting")
     
     # Get list of CSV files
     ais_data_path = os.path.join(dataset_path, 'AISVesselTracks2024')
@@ -208,31 +349,51 @@ def main():
     # Prepare arguments for parallel processing
     file_args = [(csv_filename, dataset_path) for csv_filename in l_csv_filename]
     
-    # Process CSV files in parallel
-    print("\\n" + "="*60)
+    # Process CSV files in smaller batches to manage memory
+    print("\n" + "="*60)
     print("LOADING AND PROCESSING CSV FILES")
     print("="*60)
     
     all_data = []
-    with ProcessPoolExecutor(max_workers=NUM_PROCESSES) as executor:
-        # Submit all jobs
-        future_to_file = {executor.submit(process_csv_file, args): args[0] for args in file_args}
+    
+    # Process files in batches to prevent memory overload
+    for batch_start in range(0, len(file_args), BATCH_SIZE):
+        batch_end = min(batch_start + BATCH_SIZE, len(file_args))
+        batch_args = file_args[batch_start:batch_end]
         
-        # Collect results
-        for future in tqdm(as_completed(future_to_file), total=len(file_args), 
-                          desc="Processing CSV files"):
-            try:
-                result = future.result()
-                if len(result) > 0:
-                    all_data.append(result)
-            except Exception as e:
-                filename = future_to_file[future]
-                print(f"Error processing {filename}: {e}")
+        print(f"\nProcessing batch {batch_start//BATCH_SIZE + 1}/{(len(file_args)-1)//BATCH_SIZE + 1}")
+        print(f"Files {batch_start+1}-{batch_end} of {len(file_args)}")
+        
+        with ProcessPoolExecutor(max_workers=NUM_PROCESSES) as executor:
+            # Submit batch jobs
+            future_to_file = {executor.submit(process_csv_file, args): args[0] for args in batch_args}
+            
+            # Collect batch results
+            for future in tqdm(as_completed(future_to_file), total=len(batch_args), 
+                              desc=f"Processing batch files"):
+                try:
+                    result = future.result()
+                    if len(result) > 0:
+                        all_data.append(result)
+                except Exception as e:
+                    filename = future_to_file[future]
+                    print(f"Error processing {filename}: {e}")
+        
+        # Force garbage collection after each batch
+        gc.collect()
+        print(f"Completed batch, total data arrays collected: {len(all_data)}")
+        print_memory_status(f"After batch {batch_start//BATCH_SIZE + 1}")
     
     # Combine all data
-    print("\\nCombining all data...")
+    print("\nCombining all data...")
+    print_memory_status("Before combining")
+    
     if all_data:
         m_msg = np.vstack(all_data)
+        # Clear intermediate data immediately
+        del all_data
+        gc.collect()
+        print_memory_status("After combining")
     else:
         print("No data to process!")
         return
@@ -241,25 +402,30 @@ def main():
     print(f"Data shape: {m_msg.shape}")
     
     # Print statistics
-    print("\\n" + "="*60)
+    print("\n" + "="*60)
     print("DATA STATISTICS")
     print("="*60)
     print(f"Latitude range: {np.min(m_msg[:,LAT]):.2f} to {np.max(m_msg[:,LAT]):.2f}")
     print(f"Longitude range: {np.min(m_msg[:,LON]):.2f} to {np.max(m_msg[:,LON]):.2f}")
     print(f"Speed range: {np.min(m_msg[:,SOG]):.2f} to {np.max(m_msg[:,SOG]):.2f}")
+    print(f"Vessel Types: {np.unique(m_msg[:, SHIPTYPE], return_counts=True)}")
     print(f"Unique vessels: {len(np.unique(m_msg[:,MMSI])):,}")
     
     # Save all messages to .npy file
-    print("\\nSaving all AIS messages to .npy file...")
-    os.makedirs(os.path.join('data', 'US_data'), exist_ok=True)
-    np.save(os.path.join('data', 'US_data', 'all_msgs.npy'), m_msg)
+    print("\nSaving all AIS messages to .npy file...")
+    if vessel_type is not None:
+        os.makedirs(os.path.join('data', 'US_data', vessel_type), exist_ok=True)
+        np.save(os.path.join('data', 'US_data', vessel_type, 'all_msgs.npy'), m_msg)
+    else:
+        os.makedirs(os.path.join('data', 'US_data'), exist_ok=True)
+        np.save(os.path.join('data', 'US_data', 'all_msgs.npy'), m_msg)
     
     # Split and save data
     split_and_save_data(m_msg)
     
     # Performance summary
     total_time = time.time() - start_time
-    print("\\n" + "="*60)
+    print("\n" + "="*60)
     print("PROCESSING COMPLETE!")
     print("="*60)
     print(f"Total processing time: {total_time/60:.1f} minutes")

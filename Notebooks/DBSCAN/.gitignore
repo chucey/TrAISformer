@@ -1,0 +1,5 @@
+# Ignore all directories
+*/
+
+# But don't ignore the =Template directory
+!=Template/

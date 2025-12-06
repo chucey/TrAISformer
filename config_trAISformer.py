@@ -22,7 +22,7 @@ import torch
 
 
 class Config():
-    retrain = True
+    retrain = False
     tb_log = False
 
     if torch.backends.mps.is_available():
@@ -34,23 +34,23 @@ class Config():
     print(f"Using device: {device}")
 
     max_epochs = 50
-    batch_size = 16
+    batch_size = 32
     n_samples = 16
     
-    init_seqlen = 18
-    max_seqlen = 120
-    min_seqlen =  36
-    
+    init_seqlen = 36
+    max_seqlen = 96
+    min_seqlen = 36
+
     dataset_name = "us_continent_2024" # "ct_dma", "us_continent", "us_eastcoast", "us_westcoast"
 
     if dataset_name == "us_continent_2024": #==============================
 
         # When mode == "grad" or "pos_grad", sog and cog are actually dlat and
         # dlon
-        lat_size = 400 #250 for Danish data
-        lon_size = 1000  #270 for Danish data
-        sog_size = 30
-        cog_size = 72
+        lat_size = 8000 #250 for Danish data
+        lon_size = 20000  #270 for Danish data
+        sog_size = 60 #30
+        cog_size = 360 #72
 
         
         n_lat_embd = 256
@@ -62,6 +62,9 @@ class Config():
         lat_max = 60    #58.0
         lon_min = -160  #10.3
         lon_max = -60 #13
+
+        sog_max = 30  # in m/s
+        cog_max = 360 # in degree
 
     
     #===========================================================================
@@ -84,7 +87,7 @@ class Config():
     
     # Data flags
     #===================================================
-    datadir = os.path.join(os.getcwd(), "data", "US_data", "cleaned_data")
+    datadir = os.path.join(os.getcwd(), "data", "US_data", "cleaned_data", "traisformer_training_data")
     trainset_name = os.path.join(datadir, f"{dataset_name}_train_track.pkl")
     validset_name = os.path.join(datadir, f"{dataset_name}_valid_track.pkl")
     testset_name = os.path.join(datadir, f"{dataset_name}_test_track.pkl")
@@ -103,7 +106,7 @@ class Config():
     
     # optimization parameters
     #===================================================
-    learning_rate = 6e-4 # 6e-4
+    learning_rate = 6e-4 # default6e-4
     betas = (0.9, 0.95)
     grad_norm_clip = 1.0
     weight_decay = 0.1 # only applied on matmul weights
@@ -111,7 +114,7 @@ class Config():
     lr_decay = True
     warmup_tokens = 512*20 # these two numbers come from the GPT-3 paper, but may not be good defaults elsewhere
     final_tokens = 260e9 # (at what point we reach 10% of original LR)
-    num_workers = 0 # for DataLoader
+    num_workers = 4 # for DataLoader
     
     filename = f"{dataset_name}"\
         + f"-{mode}-{sample_mode}-{top_k}-{r_vicinity}"\
@@ -121,7 +124,8 @@ class Config():
         + f"-head-{n_head}-{n_layer}"\
         + f"-bs-{batch_size}"\
         + f"-lr-{learning_rate}"\
-        + f"-seqlen-{init_seqlen}-{max_seqlen}"
+        + f"-seqlen-{init_seqlen}-{max_seqlen}"\
+        + f"-epochs-{max_epochs}"
     savedir = "./results/"+filename+"/"
     
     ckpt_path = os.path.join(savedir,"model.pt")   

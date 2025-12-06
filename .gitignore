@@ -8,6 +8,8 @@ runs/
 *.sh
 *.log
 *.ipynb
+!dbscan.ipynb
+!product_demo.ipynb
 .DS_Store
 *.out
 *.err
@@ -16,3 +18,13 @@ test_optimized_preprocessing.py
 monitor_performance.py
 sampling_config_summary.py
 .vscode
+*.csv
+models/
+cog_visualization_examples.py
+dbscan.py
+trAISformer_copy.py
+trAISformer_continuee_train.py
+dbscan_model/
+traj_list.pkl
+unified_anomaly_out.png
+behavior_plots/
