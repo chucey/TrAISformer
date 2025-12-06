@@ -14,10 +14,10 @@ from config_trAISformer import Config
 def main():
     cf = Config()
 
-    init_seqlen = cf.init_seqlen
+    init_seqlen = 24
     time_horizon = 5 #in hours
     time_steps = time_horizon * 6  # 10-min intervals
-    max_sequlen = init_seqlen + time_steps
+    # max_sequlen = 48 # 8 hours
 
     test_pkl = cf.testset_name  # full path defined in config
     print("Reading:", test_pkl)
@@ -29,9 +29,19 @@ def main():
     lon_min, lon_max = cf.lon_min, cf.lon_max
 
     rows = []
+    seen_mmsis = set()
+    traj_threshold = 60 # max number of points in traj to be included
+    count = 0
+    max_count = 1000
+    
     for V in l_data:
         mmsi = int(V["mmsi"])
-        traj = V["traj"][init_seqlen:max_sequlen, :]
+        traj = V["traj"]
+        if mmsi in seen_mmsis or len(traj) > traj_threshold or len(traj) <= init_seqlen:
+            continue
+        seen_mmsis.add(mmsi)
+        max_sequlen = len(traj)
+        traj = traj[init_seqlen:max_sequlen, :]
         # traj columns: [LAT, LON, SOG, COG, HEADING, TIMESTAMP, MMSI, SHIPTYPE, LENGTH, WIDTH, CARGO]
 
         if len(traj) == 0 or np.isnan(traj[:, :2]).any():
@@ -44,6 +54,10 @@ def main():
 
         for t, la, lo in zip(t_unix, lat_deg, lon_deg):
             rows.append((mmsi, int(t), float(la), float(lo)))
+        
+        count += 1
+        if count >= max_count:
+            break
 
     df = pd.DataFrame(rows, columns=["mmsi", "t_unix", "lat_deg", "lon_deg"])
 
