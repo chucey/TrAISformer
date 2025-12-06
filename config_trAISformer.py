@@ -22,7 +22,7 @@ import torch
 
 
 class Config():
-    retrain = True
+    retrain = False
     tb_log = False
 
     if torch.backends.mps.is_available():
@@ -37,9 +37,9 @@ class Config():
     batch_size = 32
     n_samples = 16
     
-    init_seqlen = 24
-    max_seqlen = 48
-    min_seqlen = 24
+    init_seqlen = 36
+    max_seqlen = 96
+    min_seqlen = 36
 
     dataset_name = "us_continent_2024" # "ct_dma", "us_continent", "us_eastcoast", "us_westcoast"
 
