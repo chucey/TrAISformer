@@ -249,3 +249,4 @@ def interpolate(t, track):
                          track[0,MMSI],track[0,SHIPTYPE],track[0,LENGTH],track[0,WIDTH],track[0,CARGO]])
     else:
         return None
+
