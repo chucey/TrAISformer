@@ -27,3 +27,4 @@ trAISformer_continuee_train.py
 dbscan_model/
 traj_list.pkl
 unified_anomaly_out.png
+behavior_plots/
