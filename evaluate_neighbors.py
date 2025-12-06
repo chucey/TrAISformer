@@ -52,10 +52,11 @@ def get_neighbors_for_target(df, target_mmsi, radius_km, time_tolerance_sec=0):
         neighbor_dict[t] = nbrs
     return neighbor_dict
 
-def evaluate_target(pred_csv, gt_csv, target_mmsi, radius_km, time_tolerance_sec=0):
-    df_pred = load_positions(pred_csv)
-    df_gt = load_positions(gt_csv)
-
+def evaluate_target_frames(df_pred: pd.DataFrame,
+                           df_gt: pd.DataFrame,
+                           target_mmsi: int,
+                           radius_km: float,
+                           time_tolerance_sec: int = 0):
     pred_nbrs = get_neighbors_for_target(df_pred, target_mmsi, radius_km, time_tolerance_sec)
     gt_nbrs   = get_neighbors_for_target(df_gt,   target_mmsi, radius_km, time_tolerance_sec)
 
@@ -83,11 +84,21 @@ def evaluate_target(pred_csv, gt_csv, target_mmsi, radius_km, time_tolerance_sec
         "per_t": per_t
     }
 
+def evaluate_target(pred_csv, gt_csv, target_mmsi, radius_km, time_tolerance_sec=0):
+    df_pred = load_positions(pred_csv)
+    df_gt = load_positions(gt_csv)
+    return evaluate_target_frames(df_pred, df_gt, target_mmsi, radius_km, time_tolerance_sec)
+
 def main():
     ap = argparse.ArgumentParser(description="Fast target-vessel neighbor evaluation")
     ap.add_argument("--pred_csv", required=True)
     ap.add_argument("--gt_csv", required=True)
-    ap.add_argument("--target_mmsi", type=int, required=True)
+    ap.add_argument("--target_mmsi", type=int, default=None,
+                    help="Specific MMSI to evaluate; overrides --neighbor_csv contents")
+    ap.add_argument("--neighbor_csv", type=Path, default=Path("neighbors_out/neighbor_list.csv"),
+                    help="CSV with a 'target_mmsi' column listing vessels to evaluate")
+    ap.add_argument("--max_targets", type=int, default=10,
+                    help="Maximum number of MMSIs to read from --neighbor_csv")
     ap.add_argument("--radius_nm", type=float, default=None)
     ap.add_argument("--radius_km", type=float, default=None)
     ap.add_argument("--time_tolerance_sec", type=int, default=0)
@@ -95,14 +106,48 @@ def main():
     args = ap.parse_args()
 
     radius_km = nm_to_km(args.radius_nm) if args.radius_nm else (args.radius_km or 1.852)
-    metrics = evaluate_target(args.pred_csv, args.gt_csv, args.target_mmsi, radius_km, args.time_tolerance_sec)
+    df_pred = load_positions(args.pred_csv)
+    df_gt = load_positions(args.gt_csv)
+
+    if args.target_mmsi is not None:
+        target_mmsis = [args.target_mmsi]
+    else:
+        if not args.neighbor_csv.exists():
+            raise SystemExit(f"Neighbor CSV not found: {args.neighbor_csv}")
+        df_neighbors = pd.read_csv(args.neighbor_csv)
+        if "target_mmsi" not in df_neighbors.columns:
+            raise SystemExit(f"Neighbor CSV {args.neighbor_csv} missing 'target_mmsi' column")
+        target_mmsis = []
+        for val in df_neighbors["target_mmsi"].dropna().astype(int).tolist():
+            if val not in target_mmsis:
+                target_mmsis.append(val)
+            if len(target_mmsis) >= args.max_targets:
+                break
+        if not target_mmsis:
+            raise SystemExit(f"Neighbor CSV {args.neighbor_csv} did not provide any MMSIs")
 
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    metrics["per_t"].to_csv(out_dir / f"per_t_{args.target_mmsi}.csv", index=False)
-    o = metrics["overall"]
-    print(f"[{args.target_mmsi}] Precision={o['precision']:.3f} Recall={o['recall']:.3f} F1={o['f1']:.3f}")
-    print(f"TP={o['tp']} FP={o['fp']} FN={o['fn']} | Saved results to {out_dir}")
+
+    summary_rows = []
+    for mmsi in target_mmsis:
+        metrics = evaluate_target_frames(df_pred, df_gt, mmsi, radius_km, args.time_tolerance_sec)
+        metrics["per_t"].to_csv(out_dir / f"per_t_{mmsi}.csv", index=False)
+        o = metrics["overall"]
+        summary_rows.append({
+            "mmsi": mmsi,
+            "tp": o["tp"],
+            "fp": o["fp"],
+            "fn": o["fn"],
+            "precision": o["precision"],
+            "recall": o["recall"],
+            "f1": o["f1"]
+        })
+        print(f"[{mmsi}] Precision={o['precision']:.3f} Recall={o['recall']:.3f} F1={o['f1']:.3f} | TP={o['tp']} FP={o['fp']} FN={o['fn']}")
+
+    summary_df = pd.DataFrame(summary_rows)
+    summary_df.to_csv(out_dir / "summary.csv", index=False)
+    print(f"Saved per-target summaries to {out_dir / 'summary.csv'}")
 
 if __name__ == "__main__":
     main()

@@ -559,7 +559,10 @@ def main():
     ap.add_argument("--radius_km", type=float, help="Neighbor radius in km")
     ap.add_argument("--radius_nm", type=float, help="Neighbor radius in nautical miles (overrides radius_km)")
     ap.add_argument("--time_tolerance_sec", type=int, default=0, help="± seconds to align timestamps (0 = exact)")
-    ap.add_argument("--restrict_mmsi", type=int, default=None, help="If set, evaluate only neighbors involving this MMSI")
+    ap.add_argument("--restrict_mmsi", type=int, default=None, help="Legacy option: evaluate only neighbors involving this MMSI")
+    ap.add_argument("--target_mmsi", type=int, default=None, help="Explicit MMSI to evaluate when not using a neighbor CSV")
+    ap.add_argument("--neighbor_csv", type=Path, default=Path("neighbors_out/neighbor_list.csv"), help="CSV whose target_mmsi column lists vessels to evaluate (default: neighbors_out/neighbor_list.csv)")
+    ap.add_argument("--max_targets", type=int, default=10, help="Limit the number of MMSIs read from --neighbor_csv (default: 10)")
     ap.add_argument("--out_dir", default="neighbors_eval_out", help="Directory to write detailed outputs")
     args = ap.parse_args()
 
@@ -582,12 +585,59 @@ def main():
 
     print("Evaluating neighbor sets...")
     sys.stdout.flush()
-    metrics = evaluate_neighbor_sets_optimized(pred_edges, gt_edges, restrict_mmsi=args.restrict_mmsi)
+    restrict_val = args.target_mmsi if args.target_mmsi is not None else args.restrict_mmsi
+    metrics = evaluate_neighbor_sets_optimized(pred_edges, gt_edges, restrict_mmsi=restrict_val)
 
     # Print overall
     o = metrics["overall"]
     print(f"Overall:  precision={o['precision']:.3f}  recall={o['recall']:.3f}  f1={o['f1']:.3f}  (tp={o['tp']}, fp={o['fp']}, fn={o['fn']})")
     sys.stdout.flush()
+
+    # Determine which MMSIs to evaluate individually
+    target_mmsis = []
+    if args.neighbor_csv and args.neighbor_csv.exists():
+        try:
+            df_targets = pd.read_csv(args.neighbor_csv)
+        except Exception as exc:
+            raise SystemExit(f"Failed to read neighbor CSV {args.neighbor_csv}: {exc}")
+        if "target_mmsi" not in df_targets.columns:
+            raise SystemExit(f"Neighbor CSV {args.neighbor_csv} must contain a 'target_mmsi' column")
+        seen = []
+        for val in df_targets["target_mmsi"].dropna().astype(int).tolist():
+            if val not in seen:
+                seen.append(val)
+            if len(seen) >= args.max_targets:
+                break
+        if not seen:
+            raise SystemExit(f"Neighbor CSV {args.neighbor_csv} did not yield any target_mmsi values")
+        target_mmsis = seen
+        print(f"Loaded {len(target_mmsis)} target MMSIs from {args.neighbor_csv}")
+    elif args.target_mmsi is not None:
+        target_mmsis = [args.target_mmsi]
+    elif args.restrict_mmsi is not None:
+        target_mmsis = [args.restrict_mmsi]
+    else:
+        raise SystemExit("No target MMSIs provided. Supply --neighbor_csv or --target_mmsi/--restrict_mmsi.")
+
+    per_target_rows = []
+    if target_mmsis:
+        print("\nPer-target evaluation summary:")
+        for mmsi in target_mmsis:
+            metrics_target = evaluate_neighbor_sets(pred_edges, gt_edges, restrict_mmsi=mmsi)
+            overall_target = metrics_target["overall"]
+            per_target_rows.append({
+                "mmsi": mmsi,
+                "precision": overall_target["precision"],
+                "recall": overall_target["recall"],
+                "f1": overall_target["f1"],
+                "tp": overall_target["tp"],
+                "fp": overall_target["fp"],
+                "fn": overall_target["fn"]
+            })
+            print(f"  MMSI {mmsi}: precision={overall_target['precision']:.3f}, recall={overall_target['recall']:.3f}, f1={overall_target['f1']:.3f}")
+        sys.stdout.flush()
+    else:
+        print("No target MMSIs provided or sampled for per-target evaluation.")
 
     # Save detailed outputs
     out_dir = Path(args.out_dir); out_dir.mkdir(parents=True, exist_ok=True)
@@ -595,6 +645,10 @@ def main():
     metrics["per_mmsi"].to_csv(out_dir / "per_mmsi.csv", index=False)
     pred_edges.to_csv(out_dir / "pred_edges.csv", index=False)
     gt_edges.to_csv(out_dir / "gt_edges.csv", index=False)
+    if per_target_rows:
+        per_target_df = pd.DataFrame(per_target_rows)
+        per_target_df.to_csv(out_dir / "per_target_summary.csv", index=False)
+        print(f"Per-target summary saved to {out_dir / 'per_target_summary.csv'}")
     print(f"Wrote details to: {out_dir}/")
     
     # SLURM-friendly: Print completion info

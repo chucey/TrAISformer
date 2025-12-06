@@ -187,12 +187,16 @@ def find_neighbors_for_target(
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="Neighbor vessels on TrAISformer predictions")
-    ap.add_argument("--target_mmsi", type=int, required=True,
-                    help="MMSI of the vessel of interest")
+    ap.add_argument("--target_mmsi", type=int, default=None,
+                    help="MMSI of the vessel of interest. If omitted, select random vessels.")
     ap.add_argument("--preds_csv_target", type=Path, required=True,
                     help="CSV with TrAISformer predictions for ALL vessels (includes the target)")
     ap.add_argument("--preds_csv_others", type=Path, default=None,
                     help="Optional CSV for others; default uses the same file as target.")
+    ap.add_argument("--num_random_targets", type=int, default=10,
+                    help="When --target_mmsi is omitted, pick this many random vessels (default: 10)")
+    ap.add_argument("--random_seed", type=int, default=None,
+                    help="Optional seed for random MMSI selection")
     # radius options
     ap.add_argument("--radius_km", type=float, default=None,
                     help="Proximity radius in kilometers (e.g., 1.852 ≈ 1 NM)")
@@ -213,24 +217,50 @@ if __name__ == "__main__":
         radius_km = 1.0  # default
 
     df_all = load_predictions(str(args.preds_csv_target))
+    if args.preds_csv_others is not None:
+        df_others_all = load_predictions(str(args.preds_csv_others))
+    else:
+        df_others_all = df_all.copy()
 
-    # Target's PREDICTED trajectory
-    df_target = df_all[df_all["mmsi"] == args.target_mmsi].copy()
-    if df_target.empty:
-        raise SystemExit(f"No predictions found for MMSI {args.target_mmsi} in {args.preds_csv_target}")
+    unique_mmsi = sorted(df_all["mmsi"].unique().tolist())
+    if not unique_mmsi:
+        raise SystemExit("No vessels found in predictions CSV")
 
-    # Neighbors’ PREDICTED trajectories (everyone else from the SAME predictions file)
-    df_others = df_all[df_all["mmsi"] != args.target_mmsi].copy()
+    if args.target_mmsi is not None:
+        target_mmsis = [args.target_mmsi]
+    else:
+        num_to_pick = min(args.num_random_targets, len(unique_mmsi))
+        rng = np.random.default_rng(args.random_seed)
+        target_mmsis = rng.choice(unique_mmsi, size=num_to_pick, replace=False).tolist()
+        print(f"Selected {len(target_mmsis)} random target MMSIs: {target_mmsis}")
 
+    all_outputs = []
+    for idx, target_mmsi in enumerate(target_mmsis, start=1):
+        df_target = df_all[df_all["mmsi"] == target_mmsi].copy()
+        if df_target.empty:
+            print(f"Warning: MMSI {target_mmsi} not found in {args.preds_csv_target}, skipping.")
+            continue
 
-    # Align timestamps (exact or tolerance inside the core function)
-    out = find_neighbors_for_target(
-        df_target=df_target,
-        df_others=df_others,
-        radius_km=radius_km,
-        time_tolerance_sec=args.time_tolerance_sec
-    )
+        df_others = df_others_all[df_others_all["mmsi"] != target_mmsi].copy()
+
+        out = find_neighbors_for_target(
+            df_target=df_target,
+            df_others=df_others,
+            radius_km=radius_km,
+            time_tolerance_sec=args.time_tolerance_sec
+        )
+
+        if out.empty:
+            print(f"Target {target_mmsi}: no rows produced (no timestamps or neighbors)")
+        else:
+            all_outputs.append(out)
+            print(f"Target {target_mmsi}: collected {len(out)} rows ({idx}/{len(target_mmsis)})")
+
+    if not all_outputs:
+        raise SystemExit("No neighbor rows generated for any target")
+
+    merged = pd.concat(all_outputs, ignore_index=True)
 
     args.out_csv.parent.mkdir(parents=True, exist_ok=True)
-    out.to_csv(args.out_csv, index=False)
-    print(f"Wrote neighbors to {args.out_csv} ({len(out)} rows)")
+    merged.to_csv(args.out_csv, index=False)
+    print(f"Wrote neighbors to {args.out_csv} ({len(merged)} rows across {len(all_outputs)} targets)")
