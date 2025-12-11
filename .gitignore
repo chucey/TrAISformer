@@ -10,6 +10,7 @@ runs/
 *.ipynb
 !dbscan.ipynb
 !product_demo.ipynb
+!label_dbscan_data.ipynb
 .DS_Store
 *.out
 *.err
