@@ -19,7 +19,7 @@ Please be sure to run dbscan.py first to generate the required labels.'''
 LAT, LON, SOG, COG, HEADING, TIMESTAMP, MMSI, SHIPTYPE, LENGTH, WIDTH, CARGO  = list(range(11))
 #%%
 # Load the clustered data labels
-label_file = '/home/chucey/GQP/TrAISformer/data/US_data/cleaned_data/tankers_and_cargo/dbscan_data/labels/us_continent_2024_dbscan_labels_eps18.5_min580.pkl'
+label_file = '/home/chucey/GQP/TrAISformer/data/US_data/cleaned_data/tankers_and_cargo/dbscan_data/labels/us_continent_2024_dbscan_labels_eps18.5_min580.pkl' # <- CHANGE THIS
 with open(label_file, 'rb') as f:
     dbscan_labels = pickle.load(f)
 #%%
@@ -182,9 +182,9 @@ print("\nConfusion Matrix:")
 print(confusion_matrix(y_test, y_pred))
 #%%
 # Save the trained model
-# model_path = '/home/chucey/GQP/TrAISformer/data/US_data/cleaned_data/tankers_and_cargo/dbscan_data/labels/model'
-# if not os.path.exists(model_path):
-#     os.makedirs(model_path)
-# model_file = f'gru_fcnn_dbscan_model.pkl'
-# with open(os.path.join(model_path, model_file), 'wb') as f:
-#     pickle.dump(gru_fcnn, f)
+model_path = '/home/chucey/GQP/TrAISformer/data/US_data/cleaned_data/tankers_and_cargo/dbscan_data/labels/model'
+if not os.path.exists(model_path):
+    os.makedirs(model_path)
+model_file = f'gru_fcnn_dbscan_model.pkl'
+with open(os.path.join(model_path, model_file), 'wb') as f:
+    pickle.dump(gru_fcnn, f)
