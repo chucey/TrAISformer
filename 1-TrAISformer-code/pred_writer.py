@@ -8,6 +8,10 @@ import pickle
 from models import TrAISformer
 from trainers import sample
 #%%
+'''
+This file loads the TrAISformer model and uses it to make predicitions on the first 1000 voyages with unique MMSIs that are at most 10 hours in duration
+'''
+#%%
 cf = Config()
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 #%%

@@ -29,3 +29,8 @@ dbscan_model/
 traj_list.pkl
 unified_anomaly_out.png
 behavior_plots/
+!0-Data-prep/
+!1-TrAISformer-code/
+!2-Neighbor-detection/
+!3-Anomaly-detection/
+!4-Behavior-detection/
