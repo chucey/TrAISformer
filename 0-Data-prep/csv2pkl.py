@@ -24,7 +24,7 @@
 # ==============================================================================
 
 """
-A script to merge AIS messages into AIS tracks.
+A script to merge AIS messages into AIS tracks. it takes a list of .CSV files and outputs three .pkl files - one for the train, test and vaildation set. 
 """
 import numpy as np
 import matplotlib.pyplot as plt
@@ -43,36 +43,7 @@ from tqdm import tqdm as tqdm
 ## PARAMS
 #======================================
 
-## Bretagne dataset
-# LAT_MIN = 46.5
-# LAT_MAX = 50.5
-# LON_MIN = -8.0
-# LON_MAX = -3.0
-
-# # Pkl filenames.
-# pkl_filename = "bretagne_20170103_track.pkl"
-# pkl_filename_train = "bretagne_20170103_10_20_train_track.pkl"
-# pkl_filename_valid = "bretagne_20170103_10_20_valid_track.pkl"
-# pkl_filename_test  = "bretagne_20170103_10_20_test_track.pkl"
-
-# # Path to csv files.
-# dataset_path = "./"
-# l_csv_filename =["positions_bretagne_jan_mar_2017.csv"]
-
-
-# # Training/validation/test/total period.
-# t_train_min = time.mktime(time.strptime("01/01/2017 00:00:00", "%Y-%m-%dT%H:%M:%S"))
-# t_train_max = time.mktime(time.strptime("10/03/2017 23:59:59", "%Y-%m-%dT%H:%M:%S"))
-# t_valid_min = time.mktime(time.strptime("11/03/2017 00:00:00", "%Y-%m-%dT%H:%M:%S"))
-# t_valid_max = time.mktime(time.strptime("20/03/2017 23:59:59", "%Y-%m-%dT%H:%M:%S"))
-# t_test_min  = time.mktime(time.strptime("21/03/2017 00:00:00", "%Y-%m-%dT%H:%M:%S"))
-# t_test_max  = time.mktime(time.strptime("31/03/2017 23:59:59", "%Y-%m-%dT%H:%M:%S"))
-# t_min = time.mktime(time.strptime("01/01/2017 00:00:00", "%Y-%m-%dT%H:%M:%S"))
-# t_max = time.mktime(time.strptime("31/03/2017 23:59:59", "%Y-%m-%dT%H:%M:%S"))
-
-# cargo_tanker_filename = "bretagne_20170103_cargo_tanker.npy"
-
-# Continental US(including Alaska)                  ## Aruba
+# Continental US               
 LAT_MIN = 20      #9.0
 LAT_MAX = 60       #14.0
 LON_MIN = -160      #-71.0
@@ -80,88 +51,6 @@ LON_MAX = -60     #-66.0
 
 D2C_MIN = 2000 #meters
 
-
-#===============
-"""
-dataset_path = "./"
-l_csv_filename =["aruba_5x5deg_2017305_2018031.csv",
-                 "aruba_5x5deg_2018305_2019031.csv",
-                 "aruba_5x5deg_2019305_2020031.csv"]
-l_csv_filename =["aruba_5x5deg_2017305_2018031.csv"]
-pkl_filename = "aruba_20172020_track.pkl"
-pkl_filename_train = "aruba_20172020_train_track.pkl"
-pkl_filename_valid = "aruba_20172020_valid_track.pkl"
-pkl_filename_test  = "aruba_20172020_test_track.pkl"
-
-cargo_tanker_filename = "aruba_20172020_cargo_tanker.npy"
-
-t_train_min = time.mktime(time.strptime("01/01/2017 00:00:00", "%Y-%m-%dT%H:%M:%S"))
-t_train_max = time.mktime(time.strptime("31/01/2019 23:59:59", "%Y-%m-%dT%H:%M:%S"))
-t_valid_min = time.mktime(time.strptime("01/11/2019 00:00:00", "%Y-%m-%dT%H:%M:%S"))
-t_valid_max = time.mktime(time.strptime("31/12/2019 23:59:59", "%Y-%m-%dT%H:%M:%S"))
-t_test_min  = time.mktime(time.strptime("01/01/2020 00:00:00", "%Y-%m-%dT%H:%M:%S"))
-t_test_max  = time.mktime(time.strptime("31/01/2020 23:59:59", "%Y-%m-%dT%H:%M:%S"))
-t_min = time.mktime(time.strptime("01/01/2017 00:00:00", "%Y-%m-%dT%H:%M:%S"))
-t_max = time.mktime(time.strptime("31/01/2020 23:59:59", "%Y-%m-%dT%H:%M:%S"))
-
-"""
-
-#===============
-"""
-dataset_path = "./"
-l_csv_filename =["aruba_zone1_5x5deg_2017121_2017244.csv",
-                 "aruba_5x5deg_2018121_2018244.csv",
-                 "aruba_zone1_5x5deg_2019121_2019244.csv"]
-#l_csv_filename =["aruba_5x5deg_2018121_2018244.csv"]
-pkl_filename = "aruba_20172020_summer_track.pkl"
-pkl_filename_train = "aruba_20172020_summer_train_track.pkl"
-pkl_filename_valid = "aruba_20172020_summer_valid_track.pkl"
-pkl_filename_test  = "aruba_20172020_summer_test_track.pkl"
-
-cargo_tanker_filename = "aruba_20172020_summer_cargo_tanker.npy"
-
-t_train_min = time.mktime(time.strptime("01/01/2017 00:00:00", "%Y-%m-%dT%H:%M:%S"))
-t_train_max = time.mktime(time.strptime("31/08/2018 23:59:59", "%Y-%m-%dT%H:%M:%S"))
-t_valid_min = time.mktime(time.strptime("01/05/2019 00:00:00", "%Y-%m-%dT%H:%M:%S"))
-t_valid_max = time.mktime(time.strptime("31/07/2019 23:59:59", "%Y-%m-%dT%H:%M:%S"))
-t_test_min  = time.mktime(time.strptime("01/08/2019 00:00:00", "%Y-%m-%dT%H:%M:%S"))
-t_test_max  = time.mktime(time.strptime("31/08/2019 23:59:59", "%Y-%m-%dT%H:%M:%S"))
-t_min = time.mktime(time.strptime("01/01/2017 00:00:00", "%Y-%m-%dT%H:%M:%S"))
-t_max = time.mktime(time.strptime("31/01/2020 23:59:59", "%Y-%m-%dT%H:%M:%S"))
-"""
-
-#===============
-"""
-dataset_path = "./"
-l_csv_filename =["aruba_zone1_5x5deg_2017121_2017244.csv",
-                 "aruba_5x5deg_2017305_2018031.csv",
-                 "aruba_5x5deg_2018121_2018244.csv",
-                 "Aruba_5x5deg_2018305_2019031.csv",
-                 "aruba_zone1_5x5deg_2019121_2019244.csv"]
-#l_csv_filename =["Aruba_5x5deg_2018305_2019031.csv"]
-pkl_filename = "aruba_20172019_track.pkl"
-pkl_filename_train = "aruba_20172019_all_train_track.pkl"
-pkl_filename_valid = "aruba_20172019_all_valid_track.pkl"
-pkl_filename_test  = "aruba_20172019_all_test_track.pkl"
-
-cargo_tanker_filename = "aruba_20172019_all_cargo_tanker.npy"
-
-t_train_min = time.mktime(time.strptime("01/01/2017 00:00:00", "%Y-%m-%dT%H:%M:%S"))
-t_train_max = time.mktime(time.strptime("31/01/2019 23:59:59", "%Y-%m-%dT%H:%M:%S"))
-t_valid_min = time.mktime(time.strptime("01/05/2019 00:00:00", "%Y-%m-%dT%H:%M:%S"))
-t_valid_max = time.mktime(time.strptime("31/07/2019 23:59:59", "%Y-%m-%dT%H:%M:%S"))
-t_test_min  = time.mktime(time.strptime("01/08/2019 00:00:00", "%Y-%m-%dT%H:%M:%S"))
-t_test_max  = time.mktime(time.strptime("31/08/2019 23:59:59", "%Y-%m-%dT%H:%M:%S"))
-t_min = time.mktime(time.strptime("01/01/2017 00:00:00", "%Y-%m-%dT%H:%M:%S"))
-t_max = time.mktime(time.strptime("31/01/2020 23:59:59", "%Y-%m-%dT%H:%M:%S"))
-"""
-
-#===============
-# ## Est Aruba
-# LAT_MIN = 10.0
-# LAT_MAX = 14.0
-# LON_MIN = -66.0
-# LON_MAX = -60.0
 
 dataset_path = "/home/chucey/GQP/"
 l_csv_filename = os.listdir(dataset_path+'AISVesselTracks2024/')

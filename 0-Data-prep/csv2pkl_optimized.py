@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Optimized version of csv2pkl.py with significant performance improvements
+Optimized version of csv2pkl.py with significant performance improvements. it takes a list of .CSV files and outputs three .pkl files - one for the train, test and vaildation set. 
 """
 import numpy as np
 import pandas as pd
