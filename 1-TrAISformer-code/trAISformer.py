@@ -41,8 +41,6 @@ from torch.utils.data import Dataset, DataLoader
 
 import models, trainers, datasets, utils
 from config_trAISformer import Config
-from export_hooks import PredictionWriter
-
 
 cf = Config()
 TB_LOG = cf.tb_log
@@ -105,8 +103,7 @@ if __name__ == "__main__":
             shuffle = True
         aisdls[phase] = DataLoader(aisdatasets[phase],
                                    batch_size=cf.batch_size,
-                                   shuffle=shuffle,
-                                   )
+                                   shuffle=shuffle)
     cf.final_tokens = 2 * len(aisdatasets["train"]) * cf.max_seqlen
 
     ## Model
@@ -128,83 +125,37 @@ if __name__ == "__main__":
     # Load the best model
     model.load_state_dict(torch.load(cf.ckpt_path))
 
-    v_ranges = torch.tensor([(model.lat_max - model.lat_min), (model.lon_max - model.lon_min), 0, 0]).to(cf.device)
-    v_roi_min = torch.tensor([model.lat_min, model.lon_min, 0, 0]).to(cf.device)
+    v_ranges = torch.tensor([2, 3, 0, 0]).to(cf.device)
+    v_roi_min = torch.tensor([model.lat_min, -7, 0, 0]).to(cf.device)
     max_seqlen = init_seqlen + 6 * 4
-    STEP_SECONDS = getattr(cf, "step_seconds", getattr(cf, "dt_seconds", 600))
-    pred_writer = PredictionWriter(
-    out_dir=os.path.join(cf.savedir, "predictions_out")
-)
 
     model.eval()
     l_min_errors, l_mean_errors, l_masks = [], [], []
     pbar = tqdm(enumerate(aisdls["test"]), total=len(aisdls["test"]))
     with torch.no_grad():
         for it, (seqs, masks, seqlens, mmsis, time_starts) in pbar:
-            # seqs: (B, S, 4) in normalized space (first 2 dims are lat/lon)
-            # masks: (B, max_seqlen)
-            # mmsis: (B,)
-            # time_starts: (B,) unix seconds for seq index 0
-
             seqs_init = seqs[:, :init_seqlen, :].to(cf.device)
             masks = masks[:, :max_seqlen].to(cf.device)
             batchsize = seqs.shape[0]
-            T_pred = max_seqlen - init_seqlen
-
-            # For metrics
-            error_ens = torch.zeros((batchsize, T_pred, cf.n_samples)).to(cf.device)
-
-            # For exporting predictions (collect per-sample, then mean)
-            pred_samples_latlon_deg = []  # list of (B, T_pred, 2) in degrees
-
+            error_ens = torch.zeros((batchsize, max_seqlen - cf.init_seqlen, cf.n_samples)).to(cf.device)
             for i_sample in range(cf.n_samples):
-                preds = trainers.sample(
-                    model,
-                    seqs_init,
-                    T_pred,
-                    temperature=1.0,
-                    sample=True,
-                    sample_mode=cf.sample_mode,
-                    r_vicinity=cf.r_vicinity,
-                    top_k=cf.top_k
-                )
-                # Convert inputs/preds back to degrees for metrics (and to radians for haversine)
+                preds = trainers.sample(model,
+                                        seqs_init,
+                                        max_seqlen - init_seqlen,
+                                        temperature=1.0,
+                                        sample=True,
+                                        sample_mode=cf.sample_mode,
+                                        r_vicinity=cf.r_vicinity,
+                                        top_k=cf.top_k)
                 inputs = seqs[:, :max_seqlen, :].to(cf.device)
-                # (lat/lon only span; sog/cog are 0 in v_ranges)
-                v_ranges = torch.tensor([(model.lat_max - model.lat_min), (model.lon_max - model.lon_min), 0, 0], device=cf.device)
-                v_roi_min = torch.tensor([model.lat_min, model.lon_min, 0, 0], device=cf.device)
-
-                # Degrees (for export)
-                preds_deg = (preds * v_ranges + v_roi_min)[..., :2]  # (B, T_pred, 2) degrees
-                pred_samples_latlon_deg.append(preds_deg.detach().cpu())
-
-                # Radians (for distance metrics)
-                input_coords = (inputs * v_ranges + v_roi_min) * torch.pi / 180.0
-                pred_coords  = (preds  * v_ranges + v_roi_min) * torch.pi / 180.0
+                input_coords = (inputs * v_ranges + v_roi_min) * torch.pi / 180
+                pred_coords = (preds * v_ranges + v_roi_min) * torch.pi / 180
                 d = utils.haversine(input_coords, pred_coords) * masks
                 error_ens[:, :, i_sample] = d[:, cf.init_seqlen:]
-
-            # === metrics aggregation (unchanged) ===
+            # Accumulation through batches
             l_min_errors.append(error_ens.min(dim=-1))
             l_mean_errors.append(error_ens.mean(dim=-1))
             l_masks.append(masks[:, cf.init_seqlen:])
-
-            # === export averaged predictions to CSV ===
-            # Average across samples in DEG space (safer numerically here than averaging radians)
-            preds_deg_mean = torch.stack(pred_samples_latlon_deg, dim=-1).mean(dim=-1).numpy()  # (B, T_pred, 2)
-
-            # Build timestamps for future steps:
-            # time index j in [0..T_pred-1] corresponds to absolute sequence index (init_seqlen + j)
-            # Timestamp = time_start + (init_seqlen + j) * STEP_SECONDS
-            time_starts_np = np.asarray(time_starts, dtype=np.int64)  # (B,)
-            idx_offsets = init_seqlen + np.arange(T_pred, dtype=np.int64)  # (T_pred,)
-            t_unix_batch = time_starts_np[:, None] + idx_offsets[None, :] * int(STEP_SECONDS)  # (B, T_pred)
-
-            # Write batch
-            mmsis_np = np.asarray(mmsis, dtype=np.int64)  # (B,)
-            pred_writer.write_batch("test", mmsis_np, t_unix_batch, preds_deg_mean)
-
-
 
     l_min = [x.values for x in l_min_errors]
     m_masks = torch.cat(l_masks, dim=0)
@@ -237,14 +188,10 @@ if __name__ == "__main__":
     plt.text(3.12, pred_errors[timestep] - 0.5, "{:.4f}".format(pred_errors[timestep]), fontsize=10)
     plt.xlabel("Time (hours)")
     plt.ylabel("Prediction errors (km)")
-    # plt.xlim([0, 12])
-    # plt.ylim([0, 5])
+    plt.xlim([0, 12])
+    plt.ylim([0, 20])
     # plt.ylim([0,pred_errors.max()+0.5])
     plt.savefig(cf.savedir + "prediction_error.png")
-    plt.savefig("prediction_error.png")
-    # Close CSV writer
-    pred_writer.close()
-    print("Wrote prediction CSV to:", os.path.join(cf.savedir, "predictions_out", "traisformer_preds_test.csv"))
 
 
     # Yeah, done!!!
