@@ -11,6 +11,7 @@ runs/
 !dbscan.ipynb
 !product_demo.ipynb
 !label_dbscan_data.ipynb
+!4-Behavior-detection/Final Function.ipynb
 .DS_Store
 *.out
 *.err
