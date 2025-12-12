@@ -28,12 +28,12 @@ Run `trAISformer.py` to train and evaluate the model.
 
 
 We used three clustering methods in this project for Behavior Detection: K-Means, GMM, and AHC.
-The notebooks below contain the training/fitting code used to generate centroids: K means and GMM.ipynb, GMM and AHC.ipynb
-Instead of re-running those notebooks every time, we saved the final centroids from all three methods into: Centroids.xlsx — contains the centroids for all 3 clustering methods
-To generate behavior labels for trajectories, Make sure you have:
+The notebooks contain the training/fitting code used to generate centroids: K means and GMM.ipynb, GMM and AHC.
+Instead of re-running those notebooks every time, we saved the final centroids from all three methods into: Centroids.xlsx. This file contains the centroids for all 3 clustering methods and
+to generate behavior labels for trajectories, Make sure you have:
 Centroids.xlsx
-traj_list.pkl (input trajectories file) and Run:Final Function.ipynb
-Final Function.ipynb reads the centroids from Centroids.xlsx, loads the input trajectories from traj_list.pkl, and outputs the final behavior labels.
+traj_list.pkl (input trajectories file) and finally Run:Final Function.ipynb.
+This reads the centroids from Centroids.xlsx, loads the input trajectories from traj_list.pkl, and outputs the final behavior labels.
 
 
 ### License
