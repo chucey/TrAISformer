@@ -27,6 +27,15 @@ Run `trAISformer.py` to train and evaluate the model.
 (Please note that the values given by the code are in km, while the values presented in the paper were converted to nautical mile.)
 
 
+We used three clustering methods in this project for Behavior Detection: K-Means, GMM, and AHC.
+The notebooks below contain the training/fitting code used to generate centroids: K means and GMM.ipynb, GMM and AHC.ipynb
+Instead of re-running those notebooks every time, we saved the final centroids from all three methods into: Centroids.xlsx — contains the centroids for all 3 clustering methods
+To generate behavior labels for trajectories, Make sure you have:
+Centroids.xlsx
+traj_list.pkl (input trajectories file) and Run:Final Function.ipynb
+Final Function.ipynb reads the centroids from Centroids.xlsx, loads the input trajectories from traj_list.pkl, and outputs the final behavior labels.
+
+
 ### License
 
 See `LICENSE`
