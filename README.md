@@ -1,10 +1,10 @@
 # Maritime Vessel Analysis
 
-This repo buids on the TrAISformer work found [here](https://github.com/CIA-Oceanix/TrAISformer). That repo contains a Pytorch implementation of TrAISformer---A generative transformer for AIS trajectory prediction (https://arxiv.org/abs/2109.03958). The transformer part is adapted from: https://github.com/karpathy/minGPT
+This repo builds on the TrAISformer work found [here](https://github.com/CIA-Oceanix/TrAISformer). That repo contains a Pytorch implementation of TrAISformer---A generative transformer for AIS trajectory prediction (https://arxiv.org/abs/2109.03958). The transformer part is adapted from: https://github.com/karpathy/minGPT
 
 To build on previous work, we adopted the TrAISformer architechure and tuned hyperparameters to make predictions on US vessel data. From there, we used those predicitions to detect the future positions of neighboring vessels to a target vessel.
 
-We also, applied anomaly detection to detection normal and anomalous vessel trajectories, and behavior detection to charaterize vessel behaviors over time.
+We also, applied anomaly detection to detect normal and anomalous vessel trajectories, and behavior detection to charaterize vessel behaviors over time.
 
 ---
 
@@ -14,7 +14,7 @@ We also, applied anomaly detection to detection normal and anomalous vessel traj
 
 ### Requirements:
 
-See requirements.yml
+See requirements.txt
 
 ### Datasets:
 
@@ -28,7 +28,7 @@ A processed dataset can be found in `./data/ct_dma/`
 
 ### Run
 
-For data preprocssing run,`0-Data-prep/csv2pkl_optimized.py` to convert a list of .CSV files to pickle files in a highly optimzed way. Then, run `0-Data-prep/data_prep_v2.py` the furthr preprocess the data for use. The final format of the preprocessed data is: `[LAT, LON, SOG, COG, HEADING, TIMESTAMP, MMSI, SHIPTYPE, LENGTH, WIDTH, CARGO],` and is saved in three pickle files for training, testing and validation.
+For data preprocssing run,`0-Data-prep/csv2pkl_optimized.py` to convert a list of .CSV files to pickle files in a highly optimzed way. Then, run `0-Data-prep/data_prep_v2.py` To further preprocess the data for use. The final format of the preprocessed data is: `[LAT, LON, SOG, COG, HEADING, TIMESTAMP, MMSI, SHIPTYPE, LENGTH, WIDTH, CARGO],` and is saved in three pickle files for training, testing and validation.
 
 Run `1-TrAISformer-code/trAISformer.py` to train and evaluate the model.
 (Please note that the values given by the code are in km, while the values presented in the paper were converted to nautical mile.)
@@ -37,8 +37,8 @@ Run `3-Anomaly-detection/dbscan.py` to apply DBSCAN to the cleaned dataset obtai
 
 We used three clustering methods in this project for Behavior Detection: K-Means, GMM, and AHC.
 The notebooks contain the training/fitting code used to generate centroids: K means and GMM.ipynb, GMM and AHC.
-Instead of re-running those notebooks every time, we saved the final centroids from all three methods into: Centroids.xlsx. This file contains the centroids for all 3 clustering methods and
-to generate behavior labels for trajectories, Make sure you have:
+
+Instead of re-running those notebooks every time, we saved the final centroids from all three methods into: Centroids.xlsx. This file contains the centroids for all 3 clustering methods and to generate behavior labels for trajectories, Make sure you have:
 Centroids.xlsx
 traj_list.pkl (input trajectories file) and finally Run:Final Function.ipynb.
 This reads the centroids from Centroids.xlsx, loads the input trajectories from traj_list.pkl, and outputs the final behavior labels.
