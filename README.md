@@ -33,6 +33,23 @@ For data preprocssing run,`0-Data-prep/csv2pkl_optimized.py` to convert a list o
 Run `1-TrAISformer-code/trAISformer.py` to train and evaluate the model.
 (Please note that the values given by the code are in km, while the values presented in the paper were converted to nautical mile.)
 
+Run python find_neighbors.py \
+  --preds_csv_target /path/to/predictions.csv \
+  --radius_nm 5 \
+  --out_csv neighbors_out/neighbor_list.csv 
+
+to find neighbors based on a radius of 5nm and 300s time gate
+
+Run python evaluate_neighbors_optimized.py \
+  --pred_csv /path/to/predictions.csv \
+  --gt_csv /path/to/ground_truth.csv \
+  --radius_nm 5 \
+  --time_tolerance_sec 300 \
+  --neighbor_csv neighbors_out/neighbor_list.csv \
+  --out_dir neighbors_eval_out
+
+to evaluate the neighbors returned against the ground truths. 
+
 Run `3-Anomaly-detection/dbscan.py` to apply DBSCAN to the cleaned dataset obtained from `0-Data-prep/data_prep_v2.py.` The file outputs the dbscan labels as a pickle file, and several evaluation metrics as a JSON file. Run `3-Anomaly-detection/label_and_train.py` to label the cleaned data, train a classifier and save the trained model as a pickle file.
 
 We used three clustering methods in this project for Behavior Detection: K-Means, GMM, and AHC.
