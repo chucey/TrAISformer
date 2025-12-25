@@ -125,8 +125,8 @@ if __name__ == "__main__":
     # Load the best model
     model.load_state_dict(torch.load(cf.ckpt_path))
 
-    v_ranges = torch.tensor([2, 3, 0, 0]).to(cf.device)
-    v_roi_min = torch.tensor([model.lat_min, -7, 0, 0]).to(cf.device)
+    v_ranges = torch.tensor([(model.lat_max - model.lat_min), (model.lon_max - model.lon_min), 0, 0]).to(cf.device)
+    v_roi_min = torch.tensor([model.lat_min, model.lon_min, 0, 0]).to(cf.device)
     max_seqlen = init_seqlen + 6 * 4
 
     model.eval()
