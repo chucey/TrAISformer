@@ -45,6 +45,8 @@ python find_neighbors.py \
 to find neighbors based on a radius of 5nm and 300s time gate
 
 Run
+
+```
 python evaluate_neighbors_optimized.py \
  --pred_csv /path/to/predictions.csv \
  --gt_csv /path/to/ground_truth.csv \
@@ -52,6 +54,7 @@ python evaluate_neighbors_optimized.py \
  --time_tolerance_sec 300 \
  --neighbor_csv neighbors_out/neighbor_list.csv \
  --out_dir neighbors_eval_out
+```
 
 to evaluate the neighbors returned against the ground truths.
 
