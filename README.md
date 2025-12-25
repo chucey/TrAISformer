@@ -21,6 +21,7 @@ See requirements.txt
 The data gathered for this project was obtained from the [Marine Cadastre](https://hub.marinecadastre.gov/pages/vesseltraffic) and was preprocessed using the process described below.
 
 **Note**
+
 The data used in the original TrAISformer work was provided by the [Danish Maritime Authority (DMA)](https://dma.dk/safety-at-sea/navigational-information/ais-data). Please refer to [the paper](https://arxiv.org/abs/2109.03958) for the details of the pre-processing step. The code is available here: https://github.com/CIA-Oceanix/GeoTrackNet/blob/master/data/csv2pkl.py
 
 A processed dataset can be found in `./data/ct_dma/`
@@ -28,7 +29,22 @@ A processed dataset can be found in `./data/ct_dma/`
 
 ### Run
 
-For data preprocssing run,`0-Data-prep/csv2pkl_optimized.py` to convert a list of .CSV files to pickle files in a highly optimzed way. Then, run `0-Data-prep/data_prep_v2.py` To further preprocess the data for use. The final format of the preprocessed data is: `[LAT, LON, SOG, COG, HEADING, TIMESTAMP, MMSI, SHIPTYPE, LENGTH, WIDTH, CARGO],` and is saved in three pickle files for training, testing and validation.
+For data preprocssing run,`0-Data-prep/csv2pkl_optimized.py` to convert a list of .CSV files to pickle files in a highly optimzed way. Then, run `0-Data-prep/data_prep_v2.py` to further preprocess the data for use. The final preprocessed data is a list of dictionaries in the format:
+
+```python
+[
+    {
+        'mmsi': type(int),
+        'traj': type(np.ndarray) # of shape (timesteps, 11)
+    }
+]
+```
+
+The column headings of the array are : `[LAT, LON, SOG, COG, HEADING, TIMESTAMP, MMSI, SHIPTYPE, LENGTH, WIDTH, CARGO]`
+
+Only the first four are needed for use with the trAISformer.
+
+The data is saved in three pickle files for training, testing and validation.
 
 Run `1-TrAISformer-code/trAISformer.py` to train and evaluate the model.
 (Please note that the values given by the code are in km, while the values presented in the paper were converted to nautical mile.)
